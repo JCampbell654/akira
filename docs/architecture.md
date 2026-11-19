@@ -151,3 +151,15 @@ positive definite. Zeroth-order regularization meets this condition. The
 current gradient and curvature matrices contain constant or planar null modes,
 so their priors are improper and their absolute evidence is deliberately left
 undefined until explicit boundary or null-space conventions are adopted.
+
+### 2026-11-19 — Nonlinear lens inference coupled to pixelized sources
+
+Connect `ProfileModel` lens declarations and nonlinear priors to the dense
+semi-linear source solver. At every nonlinear evaluation, rebuild the
+lensing-plus-PSF operator, solve the regularized source, and differentiate the
+complete calculation with JAX. Provide source-marginalized Gaussian evidence,
+penalized likelihood, and profile likelihood objectives. All objectives add
+the declared nonlinear priors, producing MAP lens estimates. Permit the
+regularization strength to be fixed or declared as another free parameter.
+Restrict the evidence objective to positive-definite regularization while
+allowing singular gradient and curvature forms with the diagnostic objectives.

@@ -40,6 +40,11 @@ from akira.pixelized import (
     regularization_matrix,
     solve_source,
 )
+from akira.pixelized_inference import (
+    PixelizedInferenceResult,
+    PixelizedLensModel,
+    fit_pixelized_model,
+)
 from akira.profiles import (
     EllipticalPowerLaw,
     ExternalShear,
@@ -69,6 +74,8 @@ __all__ = [
     "FitResult",
     "PSF",
     "PixelizedReconstruction",
+    "PixelizedInferenceResult",
+    "PixelizedLensModel",
     "ProfileModel",
     "SIS",
     "Sersic",
@@ -80,6 +87,7 @@ __all__ = [
     "bilinear_interpolation_matrix",
     "fit_sis_einstein_radius",
     "fit_model",
+    "fit_pixelized_model",
     "forward_operator",
     "fit_epl_sersic_parameters",
     "gaussian_log_likelihood",

@@ -18,6 +18,9 @@ Run them in order for the most natural introduction:
 6. `06_pixelized_source_reconstruction.ipynb` builds the dense lensing operator,
    reconstructs a regular pixelized source, and compares zeroth, gradient, and
    curvature regularization.
+7. `07_free_lens_pixelized_inference.ipynb` optimizes nonlinear power-law lens
+   parameters while solving and marginalizing a pixelized source at every
+   evaluation.
 
 Install the notebook dependencies into the project environment with:
 
