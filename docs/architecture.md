@@ -75,6 +75,13 @@ These names are provisional and should be tested against real usage before the p
 
 For power-law mass profiles, `slope` (or `gamma`) denotes the three-dimensional density slope in `rho(r) proportional to r**(-gamma)`. The isothermal value is exactly `gamma = 2`. Any projected-slope representation must use a different explicit name and document its conversion.
 
+The implemented elliptical power-law follows Tessore and Metcalf (2015), with
+projected slope `t = gamma - 1`. Its public Einstein radius is circularized;
+the paper's semi-minor-axis scale is `b = einstein_radius * sqrt(q)`. External
+shear uses `gamma1 = strength*cos(2*phi)` and
+`gamma2 = strength*sin(2*phi)`. Sérsic `intensity` is the brightness at the
+circularized half-light radius `effective_radius`.
+
 ## Decisions still required
 
 - Final package/distribution name. The working project designation is Project Akira.
@@ -106,3 +113,12 @@ All power-law mass-profile slopes describe the three-dimensional density, `rho(r
 ### 2026-11-19 — Initial imaging and inference conventions established
 
 PSF kernels are explicitly normalized and odd-sized. Detector convolution is zero-padded linear convolution, not circular convolution. Image masks use `True` for excluded pixels and are applied to likelihood evaluation after the full convolved model is formed. Independent Gaussian image likelihoods include their normalization term. Simulated noise is generated only from an explicit random seed. The initial verified inference path fits an SIS Einstein radius with a fixed Gaussian source using JAX gradients and SciPy L-BFGS-B.
+
+### 2026-11-19 — Elliptical analytic vertical slice implemented
+
+Implement the Tessore--Metcalf elliptical power-law deflection using a fixed,
+JAX-compatible Fourier recurrence, plus external shear and elliptical Sérsic
+light. Compose profiles by summing mass deflections and light brightnesses.
+Validate the first multi-parameter inference path by fitting Einstein radius,
+3D density slope, and the two source-centre coordinates while holding the
+remaining analytic shape parameters fixed.

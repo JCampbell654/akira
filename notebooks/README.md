@@ -9,6 +9,9 @@ Run them in order for the most natural introduction:
    reproducible noise, masks, and the normalized Gaussian likelihood.
 3. `03_fit_einstein_radius.ipynb` scans the likelihood, inspects its gradient,
    and recovers an SIS Einstein radius from noisy imaging.
+4. `04_elliptical_power_law_sersic.ipynb` composes an elliptical power-law
+   lens, external shear, and Sérsic source, verifies the SIS limit, and fits
+   the Einstein radius, 3D density slope, and source position.
 
 Install the notebook dependencies into the project environment with:
 
@@ -18,4 +21,3 @@ Install the notebook dependencies into the project environment with:
 
 Select the Python interpreter at `.venv/bin/python` when opening a notebook.
 All angular positions and radii are in arcseconds; `phi` is in radians.
-
