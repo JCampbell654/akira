@@ -30,7 +30,7 @@ See [docs/architecture.md](docs/architecture.md) for the evolving design and dec
 
 ## Current status
 
-Four executable vertical slices are implemented. The first is a JAX-based,
+Five executable vertical slices are implemented. The first is a JAX-based,
 float64, single-plane SIS lens with an elliptical Gaussian source, Cartesian
 image grids, sub-pixel integration, ray tracing, and independent NumPy/analytic
 verification. The second adds normalized PSFs, zero-padded convolution,
@@ -43,6 +43,10 @@ The fourth introduces general fixed/free parameter declarations, uniform,
 Gaussian, log-uniform, and truncated-Gaussian priors, automatic parameter
 vector construction, and generic maximum-likelihood or MAP optimization for
 any composition of the currently implemented analytic profiles.
+The fifth adds a dense, differentiable reference implementation of regular
+pixelized source reconstruction: bilinear ray-tracing, PSF propagation,
+Warren--Dye semi-linear inversion, three regularization forms, source
+covariance, and proper-Gaussian evidence where mathematically defined.
 
 Run the tests from the repository root:
 
@@ -71,7 +75,7 @@ Run the elliptical analytic model and four-parameter recovery example with:
 
 ## Tutorials
 
-The [`notebooks`](notebooks/) directory contains five executable tutorials:
+The [`notebooks`](notebooks/) directory contains six executable tutorials:
 
 1. Build the SIS-plus-Gaussian forward model from its individual equations.
 2. Add PSF convolution, masks, seeded noise, and image likelihoods.
@@ -80,6 +84,8 @@ The [`notebooks`](notebooks/) directory contains five executable tutorials:
    its Einstein radius, 3D density slope, and source position.
 5. Define priors and arbitrary free parameters, then run a generic
    six-parameter maximum-a-posteriori fit.
+6. Reconstruct a non-parametric source and compare zeroth, gradient, and
+   curvature regularization.
 
 Install the optional notebook environment with:
 

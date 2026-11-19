@@ -15,6 +15,9 @@ Run them in order for the most natural introduction:
 5. `05_general_inference_and_priors.ipynb` declares arbitrary fixed and free
    profile parameters, applies several prior families, and performs a generic
    six-parameter maximum-a-posteriori fit.
+6. `06_pixelized_source_reconstruction.ipynb` builds the dense lensing operator,
+   reconstructs a regular pixelized source, and compares zeroth, gradient, and
+   curvature regularization.
 
 Install the notebook dependencies into the project environment with:
 

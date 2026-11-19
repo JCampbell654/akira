@@ -134,3 +134,20 @@ named vector and reconstruct `LensPlane` and `CompositeLight` objects inside
 the differentiable rendering calculation. The initial generic inference path
 supports maximum-likelihood and maximum-a-posteriori L-BFGS-B fitting; posterior
 sampling remains a subsequent milestone.
+
+### 2026-11-19 — Dense regular pixelized source inversion implemented
+
+Implement the Warren--Dye semi-linear inversion on a regular Cartesian source
+grid. Use bilinear interpolation from ray-traced image sub-pixels, average over
+detector pixels, and propagate every source basis image through the PSF to form
+a dense forward operator. Provide zeroth, nearest-neighbour gradient, and axial
+curvature regularization matrices, the regularized linear solution, source
+covariance, image diagnostics, and a differentiable lower-level solve. Treat
+this as the inspectable correctness reference for a future sparse or
+matrix-free production implementation.
+
+Absolute Gaussian evidence is reported only when the regularization matrix is
+positive definite. Zeroth-order regularization meets this condition. The
+current gradient and curvature matrices contain constant or planar null modes,
+so their priors are improper and their absolute evidence is deliberately left
+undefined until explicit boundary or null-space conventions are adopted.
