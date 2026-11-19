@@ -122,3 +122,15 @@ light. Compose profiles by summing mass deflections and light brightnesses.
 Validate the first multi-parameter inference path by fitting Einstein radius,
 3D density slope, and the two source-centre coordinates while holding the
 remaining analytic shape parameters fixed.
+
+### 2026-11-19 — General parameter and prior framework implemented
+
+Represent inference models as declarative compositions of the existing
+scientific profile classes. Plain values are fixed, while `FreeParameter`
+associates an initial value with a normalized prior. Support uniform, Gaussian,
+log-uniform, and truncated-Gaussian priors with both JAX-compatible log density
+and unit-cube transformation. Automatically flatten free values into a stable
+named vector and reconstruct `LensPlane` and `CompositeLight` objects inside
+the differentiable rendering calculation. The initial generic inference path
+supports maximum-likelihood and maximum-a-posteriori L-BFGS-B fitting; posterior
+sampling remains a subsequent milestone.

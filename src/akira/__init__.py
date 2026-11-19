@@ -13,6 +13,18 @@ from akira.fit import (
     fit_sis_einstein_radius,
 )
 from akira.imaging import ImagingObservation, PSF, gaussian_psf
+from akira.inference import (
+    Fixed,
+    FreeParameter,
+    GaussianPrior,
+    InferenceResult,
+    LensModel,
+    LogUniformPrior,
+    ProfileModel,
+    TruncatedGaussianPrior,
+    UniformPrior,
+    fit_model,
+)
 from akira.lensing import ray_trace
 from akira.likelihood import gaussian_log_likelihood
 from akira.model import CompositeLight, LensPlane
@@ -33,15 +45,25 @@ __all__ = [
     "EPLSersicFitResult",
     "EPLSersicParameters",
     "ExternalShear",
+    "Fixed",
+    "FreeParameter",
     "Gaussian",
+    "GaussianPrior",
     "ImagingObservation",
     "LensPlane",
+    "LensModel",
+    "LogUniformPrior",
+    "InferenceResult",
     "FitResult",
     "PSF",
+    "ProfileModel",
     "SIS",
     "Sersic",
+    "TruncatedGaussianPrior",
+    "UniformPrior",
     "degrees_to_radians",
     "fit_sis_einstein_radius",
+    "fit_model",
     "fit_epl_sersic_parameters",
     "gaussian_log_likelihood",
     "gaussian_psf",

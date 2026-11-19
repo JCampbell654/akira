@@ -12,6 +12,9 @@ Run them in order for the most natural introduction:
 4. `04_elliptical_power_law_sersic.ipynb` composes an elliptical power-law
    lens, external shear, and Sérsic source, verifies the SIS limit, and fits
    the Einstein radius, 3D density slope, and source position.
+5. `05_general_inference_and_priors.ipynb` declares arbitrary fixed and free
+   profile parameters, applies several prior families, and performs a generic
+   six-parameter maximum-a-posteriori fit.
 
 Install the notebook dependencies into the project environment with:
 

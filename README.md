@@ -30,7 +30,7 @@ See [docs/architecture.md](docs/architecture.md) for the evolving design and dec
 
 ## Current status
 
-Three executable vertical slices are implemented. The first is a JAX-based,
+Four executable vertical slices are implemented. The first is a JAX-based,
 float64, single-plane SIS lens with an elliptical Gaussian source, Cartesian
 image grids, sub-pixel integration, ray tracing, and independent NumPy/analytic
 verification. The second adds normalized PSFs, zero-padded convolution,
@@ -39,6 +39,10 @@ likelihoods, and gradient-based recovery of an SIS Einstein radius. The third
 adds an elliptical power-law mass profile, external shear, elliptical Sérsic
 light, composable mass and light components, and a controlled four-parameter
 fit of Einstein radius, 3D density slope, and source position.
+The fourth introduces general fixed/free parameter declarations, uniform,
+Gaussian, log-uniform, and truncated-Gaussian priors, automatic parameter
+vector construction, and generic maximum-likelihood or MAP optimization for
+any composition of the currently implemented analytic profiles.
 
 Run the tests from the repository root:
 
@@ -67,13 +71,15 @@ Run the elliptical analytic model and four-parameter recovery example with:
 
 ## Tutorials
 
-The [`notebooks`](notebooks/) directory contains four executable tutorials:
+The [`notebooks`](notebooks/) directory contains five executable tutorials:
 
 1. Build the SIS-plus-Gaussian forward model from its individual equations.
 2. Add PSF convolution, masks, seeded noise, and image likelihoods.
 3. Inspect the likelihood surface and recover an SIS Einstein radius.
 4. Compose an elliptical power-law lens, shear, and Sérsic source, then recover
    its Einstein radius, 3D density slope, and source position.
+5. Define priors and arbitrary free parameters, then run a generic
+   six-parameter maximum-a-posteriori fit.
 
 Install the optional notebook environment with:
 
