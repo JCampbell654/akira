@@ -56,4 +56,21 @@ Run the noisy parameter-recovery example from the project environment:
 .venv/bin/python examples/fit_sis_gaussian.py
 ```
 
+## Tutorials
+
+The [`notebooks`](notebooks/) directory contains three executable tutorials:
+
+1. Build the SIS-plus-Gaussian forward model from its individual equations.
+2. Add PSF convolution, masks, seeded noise, and image likelihoods.
+3. Inspect the likelihood surface and recover an SIS Einstein radius.
+
+Install the optional notebook environment with:
+
+```bash
+.venv/bin/python -m pip install -e '.[test,notebook]'
+```
+
+Then open the notebooks using the `.venv/bin/python` interpreter. Each notebook
+is self-contained and has been verified from a clean kernel.
+
 The distribution and import names are provisional during pre-1.0 development.
