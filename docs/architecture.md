@@ -102,3 +102,7 @@ Use a JAX-first production core with independent NumPy/SciPy reference calculati
 ### 2026-11-19 — Power-law slope convention established
 
 All power-law mass-profile slopes describe the three-dimensional density, `rho(r) proportional to r**(-gamma)`. An isothermal density profile has `gamma = 2`.
+
+### 2026-11-19 — Initial imaging and inference conventions established
+
+PSF kernels are explicitly normalized and odd-sized. Detector convolution is zero-padded linear convolution, not circular convolution. Image masks use `True` for excluded pixels and are applied to likelihood evaluation after the full convolved model is formed. Independent Gaussian image likelihoods include their normalization term. Simulated noise is generated only from an explicit random seed. The initial verified inference path fits an SIS Einstein radius with a fixed Gaussian source using JAX gradients and SciPy L-BFGS-B.

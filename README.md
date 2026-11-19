@@ -30,9 +30,12 @@ See [docs/architecture.md](docs/architecture.md) for the evolving design and dec
 
 ## Current status
 
-The first executable vertical slice is implemented: a JAX-based, float64,
-single-plane SIS lens with an elliptical Gaussian source, Cartesian image grids,
-sub-pixel integration, ray tracing, and independent NumPy/analytic verification.
+Two executable vertical slices are implemented. The first is a JAX-based,
+float64, single-plane SIS lens with an elliptical Gaussian source, Cartesian
+image grids, sub-pixel integration, ray tracing, and independent NumPy/analytic
+verification. The second adds normalized PSFs, zero-padded convolution,
+validated observations, masks, reproducible Gaussian noise, normalized image
+likelihoods, and gradient-based recovery of an SIS Einstein radius.
 
 Run the tests from the repository root:
 
@@ -45,6 +48,12 @@ development checkout by placing `src` on `PYTHONPATH`:
 
 ```bash
 PYTHONPATH=src python examples/sis_gaussian.py
+```
+
+Run the noisy parameter-recovery example from the project environment:
+
+```bash
+.venv/bin/python examples/fit_sis_gaussian.py
 ```
 
 The distribution and import names are provisional during pre-1.0 development.

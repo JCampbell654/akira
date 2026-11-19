@@ -15,6 +15,7 @@ authors = [
 dependencies = [
   "jax>=0.4.30",
   "numpy>=1.26",
+  "scipy>=1.15",
 ]
 
 [project.optional-dependencies]
@@ -29,4 +30,3 @@ packages = ["src/akira"]
 addopts = "-ra --strict-markers"
 testpaths = ["tests"]
 pythonpath = ["src"]
-
