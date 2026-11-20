@@ -11,6 +11,8 @@ import argparse
 import json
 import math
 from pathlib import Path
+import threading
+import time
 from typing import Any
 
 import matplotlib
@@ -28,6 +30,7 @@ from akira import (
     GaussianPrior,
     ImagingObservation,
     LogUniformPrior,
+    OptimizationProgress,
     PSF,
     PixelizedLensModel,
     ProfileModel,
@@ -38,6 +41,68 @@ from akira import (
     fit_pixelized_model,
     plot_caustics,
 )
+
+
+class _ProgressDisplay:
+    """Periodic terminal feedback, including while the first JAX call compiles."""
+
+    def __init__(self, report_every: int = 5, heartbeat_seconds: float = 15.0):
+        self.report_every = max(1, report_every)
+        self.heartbeat_seconds = heartbeat_seconds
+        self.start = time.monotonic()
+        self.stop_event = threading.Event()
+        self.latest: OptimizationProgress | None = None
+        self.thread = threading.Thread(target=self._heartbeat, daemon=True)
+
+    def begin(self) -> None:
+        print("Starting fit; the first JAX compilation can take a while...", flush=True)
+        self.thread.start()
+
+    def update(self, progress: OptimizationProgress) -> None:
+        self.latest = progress
+        if progress.evaluation == 1 or progress.evaluation % self.report_every == 0:
+            self._print(progress)
+
+    def _print(self, progress: OptimizationProgress) -> None:
+        rate = progress.evaluation / max(progress.elapsed_seconds, 1e-12)
+        print(
+            f"Fit running | evaluation {progress.evaluation} | "
+            f"elapsed {_format_duration(progress.elapsed_seconds)} | "
+            f"{rate:.2f} eval/s | objective {progress.objective_value:.6g} | "
+            f"best {progress.best_objective_value:.6g} | "
+            f"gradient {progress.gradient_norm:.3g}",
+            flush=True,
+        )
+
+    def _heartbeat(self) -> None:
+        while not self.stop_event.wait(self.heartbeat_seconds):
+            elapsed = time.monotonic() - self.start
+            if self.latest is None:
+                print(
+                    f"Still compiling the first evaluation | "
+                    f"elapsed {_format_duration(elapsed)}",
+                    flush=True,
+                )
+            else:
+                print(
+                    f"Still working on evaluation {self.latest.evaluation + 1} | "
+                    f"elapsed {_format_duration(elapsed)}",
+                    flush=True,
+                )
+
+    def finish(self) -> None:
+        self.stop_event.set()
+        self.thread.join()
+
+
+def _format_duration(seconds: float) -> str:
+    minutes, remaining = divmod(int(seconds), 60)
+    hours, minutes = divmod(minutes, 60)
+    if hours:
+        return f"{hours:d}h {minutes:02d}m {remaining:02d}s"
+    if minutes:
+        return f"{minutes:d}m {remaining:02d}s"
+    return f"{remaining:d}s"
 
 
 def _load_array(spec: str | dict[str, Any], base: Path) -> np.ndarray:
@@ -295,14 +360,20 @@ def run(config_path: Path) -> int:
     strength_bounds = config["regularization"]["strength_bounds"]
     if strength_bounds[0] <= 0 or strength_bounds[0] >= strength_bounds[1]:
         raise ValueError("regularization strength_bounds must be positive and ordered.")
-    result = fit_pixelized_model(
-        model,
-        observation,
-        image_grid,
-        objective="evidence",
-        optimize_regularization_strength=True,
-        log_strength_bounds=tuple(math.log(value) for value in strength_bounds),
-    )
+    progress = _ProgressDisplay(report_every=int(config.get("progress_every", 5)))
+    progress.begin()
+    try:
+        result = fit_pixelized_model(
+            model,
+            observation,
+            image_grid,
+            objective="evidence",
+            optimize_regularization_strength=True,
+            log_strength_bounds=tuple(math.log(value) for value in strength_bounds),
+            progress_callback=progress.update,
+        )
+    finally:
+        progress.finish()
     output_directory = Path(config.get("output_directory", "fit_output"))
     if not output_directory.is_absolute():
         output_directory = base / output_directory

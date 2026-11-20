@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import math
-from typing import Literal
+import time
+from typing import Callable, Literal
 
 import jax
 import jax.numpy as jnp
@@ -28,6 +29,17 @@ from akira.pixelized import (
 
 
 PixelizedObjective = Literal["evidence", "penalized", "profile_likelihood"]
+
+
+@dataclass(frozen=True, slots=True)
+class OptimizationProgress:
+    """A completed nonlinear objective evaluation during optimization."""
+
+    evaluation: int
+    objective_value: float
+    best_objective_value: float
+    gradient_norm: float
+    elapsed_seconds: float
 
 
 @dataclass(frozen=True, slots=True)
@@ -143,6 +155,7 @@ def fit_pixelized_model(
     objective: PixelizedObjective = "evidence",
     optimize_regularization_strength: bool = False,
     log_strength_bounds: tuple[float, float] = (-20.0, 30.0),
+    progress_callback: Callable[[OptimizationProgress], None] | None = None,
 ) -> PixelizedInferenceResult:
     """Optimize nonlinear lens parameters while solving source pixels linearly.
 
@@ -235,9 +248,28 @@ def fit_pixelized_model(
 
     value_and_gradient = jax.jit(jax.value_and_grad(negative_target))
 
+    evaluation_count = 0
+    best_objective = math.inf
+    start_time = time.monotonic()
+
     def scipy_objective(values: np.ndarray) -> tuple[float, np.ndarray]:
+        nonlocal evaluation_count, best_objective
         value, gradient = value_and_gradient(jnp.asarray(values, dtype=jnp.float64))
-        return float(value), np.asarray(gradient, dtype=np.float64)
+        float_value = float(value)
+        numpy_gradient = np.asarray(gradient, dtype=np.float64)
+        evaluation_count += 1
+        best_objective = min(best_objective, float_value)
+        if progress_callback is not None:
+            progress_callback(
+                OptimizationProgress(
+                    evaluation=evaluation_count,
+                    objective_value=float_value,
+                    best_objective_value=best_objective,
+                    gradient_norm=float(np.linalg.norm(numpy_gradient)),
+                    elapsed_seconds=time.monotonic() - start_time,
+                )
+            )
+        return float_value, numpy_gradient
 
     initial_values = np.asarray(model.initial_vector, dtype=np.float64)
     optimization_bounds = [

@@ -49,6 +49,7 @@ from akira.pixelized import (
     solve_source,
 )
 from akira.pixelized_inference import (
+    OptimizationProgress,
     PixelizedInferenceResult,
     PixelizedLensModel,
     fit_pixelized_model,
@@ -87,6 +88,7 @@ __all__ = [
     "InferenceResult",
     "FitResult",
     "PSF",
+    "OptimizationProgress",
     "PixelizedReconstruction",
     "PixelizedInferenceResult",
     "PixelizedLensModel",

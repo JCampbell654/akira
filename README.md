@@ -120,6 +120,12 @@ footprints, because flux from a neighbouring masked pixel can contribute to an
 unmasked detector pixel after convolution. The script reports both dimensions
 and an approximate base-memory cost before optimization begins.
 
+The terminal prints a heartbeat every 15 seconds, including during the first
+JAX compilation, followed by objective value, best objective, gradient norm,
+elapsed time and evaluation rate as the optimizer runs. Set `progress_every`
+in the JSON configuration to control how many objective evaluations occur
+between detailed reports; the default is five.
+
 ## Tutorials
 
 The [`notebooks`](notebooks/) directory contains eight executable tutorials:

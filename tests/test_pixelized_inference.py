@@ -156,6 +156,25 @@ def test_joint_lens_and_log_regularization_optimization():
     assert float(result.parameter_vector[1]) == pytest.approx(2.08, abs=0.012)
 
 
+def test_fit_reports_objective_evaluation_progress():
+    image_grid, source_grid, observation = make_problem()
+    updates = []
+    result = fit_pixelized_model(
+        make_model(source_grid),
+        observation,
+        image_grid,
+        objective="evidence",
+        progress_callback=updates.append,
+    )
+    assert result.success
+    assert len(updates) == result.evaluations
+    assert [update.evaluation for update in updates] == list(
+        range(1, result.evaluations + 1)
+    )
+    assert updates[-1].elapsed_seconds > 0
+    assert updates[-1].best_objective_value <= updates[-1].objective_value
+
+
 def test_invalid_objective_and_empty_free_parameter_set_are_rejected():
     image_grid, source_grid, observation = make_problem()
     with pytest.raises(ValueError, match="objective must"):
