@@ -47,6 +47,7 @@ from akira.pixelized import (
     reconstruct_from_masked_operator,
     regularization_matrix,
     solve_source,
+    source_grid_from_lens,
 )
 from akira.pixelized_inference import (
     OptimizationProgress,
@@ -123,6 +124,7 @@ __all__ = [
     "reconstruct_from_masked_operator",
     "regularization_matrix",
     "solve_source",
+    "source_grid_from_lens",
     "render",
     "render_sis_gaussian",
     "simulate_imaging",

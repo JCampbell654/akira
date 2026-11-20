@@ -40,6 +40,7 @@ from akira import (
     find_lensing_curves,
     fit_pixelized_model,
     plot_caustics,
+    source_grid_from_lens,
 )
 
 
@@ -330,7 +331,7 @@ def _save_results(
     plt.close(figure)
 
 
-def run(config_path: Path) -> int:
+def run(config_path: Path, dry_run: bool = False) -> int:
     config_path = config_path.resolve()
     config = json.loads(config_path.read_text())
     base = config_path.parent
@@ -350,13 +351,41 @@ def run(config_path: Path) -> int:
         data.shape, pixel_scale, supersampling=int(config.get("supersampling", 1))
     )
     source_config = config["source_grid"]
-    source_grid = SourceGrid(
-        tuple(source_config["shape"]),
-        float(source_config["pixel_scale"]),
-        tuple(source_config.get("centre", (0.0, 0.0))),
-    )
+    source_shape = tuple(source_config["shape"])
+    if source_config.get("auto_extent", False):
+        # Source-grid properties do not enter the analytic lens model, so a
+        # temporary grid is sufficient to construct its initial/reference lens.
+        temporary_grid = SourceGrid(source_shape, 1.0)
+        reference_model = _make_model(config, temporary_grid)
+        reference_lens, _ = reference_model.build(reference_model.initial_vector)
+        source_grid = source_grid_from_lens(
+            image_grid,
+            reference_lens,
+            source_shape,
+            observation.mask,
+            padding_fraction=float(source_config.get("padding_fraction", 0.05)),
+            exclude_ray_fraction=float(
+                source_config.get("exclude_ray_fraction", 0.0)
+            ),
+        )
+        print(
+            "Automatically determined source grid: "
+            f"shape={source_grid.shape}, pixel_scale={source_grid.pixel_scale:.6g} "
+            f"arcsec, centre=({source_grid.centre[0]:+.6g}, "
+            f"{source_grid.centre[1]:+.6g}) arcsec.",
+            flush=True,
+        )
+    else:
+        source_grid = SourceGrid(
+            source_shape,
+            float(source_config["pixel_scale"]),
+            tuple(source_config.get("centre", (0.0, 0.0))),
+        )
     model = _make_model(config, source_grid)
     _report_memory_scale(observation, source_grid, image_grid.supersampling)
+    if dry_run:
+        print("Dry run complete; optimization was not started.", flush=True)
+        return 0
     strength_bounds = config["regularization"]["strength_bounds"]
     if strength_bounds[0] <= 0 or strength_bounds[0] >= strength_bounds[1]:
         raise ValueError("regularization strength_bounds must be positive and ordered.")
@@ -391,7 +420,13 @@ def run(config_path: Path) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, required=True)
-    return run(parser.parse_args().config)
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="validate inputs and report the chosen grid without fitting",
+    )
+    arguments = parser.parse_args()
+    return run(arguments.config, dry_run=arguments.dry_run)
 
 
 if __name__ == "__main__":

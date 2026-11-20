@@ -50,6 +50,59 @@ class SourceGrid:
         return jnp.stack((xx, yy), axis=-1)
 
 
+def source_grid_from_lens(
+    image_grid: CartesianGrid,
+    lens: LensPlane,
+    shape: tuple[int, int],
+    mask: Array | None = None,
+    padding_fraction: float = 0.05,
+    exclude_ray_fraction: float = 0.0,
+) -> SourceGrid:
+    """Construct a fixed regular source grid from ray-traced image pixels.
+
+    Selected image-pixel centres are ray-traced through a reference lens. A
+    square pixel scale is chosen so ``shape`` contains the resulting bounding
+    box, with ``padding_fraction`` added on every side. Optionally, an equal
+    ``exclude_ray_fraction`` is removed from both tails of each coordinate to
+    prevent a few outlying rays from controlling the full extent.
+
+    Construct this grid once before nonlinear inference and then hold it fixed.
+    """
+
+    if len(shape) != 2 or any(size <= 1 for size in shape):
+        raise ValueError("Source-grid dimensions must each exceed one pixel.")
+    if not math.isfinite(padding_fraction) or padding_fraction < 0:
+        raise ValueError("padding_fraction must be finite and non-negative.")
+    if (
+        not math.isfinite(exclude_ray_fraction)
+        or not 0 <= exclude_ray_fraction < 0.5
+    ):
+        raise ValueError("exclude_ray_fraction must satisfy 0 <= value < 0.5.")
+    if mask is None:
+        active = np.ones(image_grid.shape, dtype=bool)
+    else:
+        mask_array = np.asarray(mask, dtype=bool)
+        if mask_array.shape != image_grid.shape:
+            raise ValueError("mask and image-grid shapes must match.")
+        active = ~mask_array
+    if not np.any(active):
+        raise ValueError("At least one image pixel must be selected.")
+
+    coordinates = image_grid.coordinates().reshape((-1, 2))
+    selected = coordinates[jnp.asarray(active.reshape(-1))]
+    traced = np.asarray(ray_trace(selected, lens.deflection(selected)))
+    lower = np.quantile(traced, exclude_ray_fraction, axis=0)
+    upper = np.quantile(traced, 1.0 - exclude_ray_fraction, axis=0)
+    spans = upper - lower
+    if not np.all(np.isfinite(spans)) or np.any(spans <= 0):
+        raise ValueError("Ray-traced source extent must be finite and non-zero.")
+    padded_spans = spans * (1.0 + 2.0 * padding_fraction)
+    ny, nx = shape
+    pixel_scale = max(padded_spans[0] / (nx - 1), padded_spans[1] / (ny - 1))
+    centre = tuple(map(float, 0.5 * (lower + upper)))
+    return SourceGrid(shape=shape, pixel_scale=float(pixel_scale), centre=centre)
+
+
 def bilinear_interpolation_matrix(coordinates: Array, source_grid: SourceGrid) -> Array:
     """Map flattened source pixels to arbitrary source-plane coordinates.
 

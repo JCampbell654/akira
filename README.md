@@ -126,6 +126,18 @@ elapsed time and evaluation rate as the optimizer runs. Set `progress_every`
 in the JSON configuration to control how many objective evaluations occur
 between detailed reports; the default is five.
 
+Set `source_grid.auto_extent` to `true` to ray-trace every unmasked image-pixel
+centre through the configured initial lens and construct a fixed source grid
+covering that footprint. `padding_fraction` adds a fractional margin on every
+side; `exclude_ray_fraction` optionally removes the stated fraction from each
+coordinate tail before measuring the extent. Preview the result without
+starting an optimization with:
+
+```bash
+.venv/bin/python examples/fit_real_data.py \
+    --config examples/real_data_config.json --dry-run
+```
+
 ## Tutorials
 
 The [`notebooks`](notebooks/) directory contains eight executable tutorials:

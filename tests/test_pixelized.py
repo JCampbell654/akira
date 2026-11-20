@@ -24,6 +24,7 @@ from akira import (
     reconstruct_source,
     regularization_matrix,
     solve_source,
+    source_grid_from_lens,
 )
 
 
@@ -39,6 +40,39 @@ def test_source_grid_coordinates_follow_xy_and_array_yx_conventions():
     assert coordinates.shape == (3, 4, 2)
     assert coordinates[0, 0] == pytest.approx([-0.2, -0.4])
     assert coordinates[-1, -1] == pytest.approx([0.4, 0.0])
+
+
+def test_source_grid_can_be_determined_from_masked_ray_traced_extent():
+    image_grid = CartesianGrid((7, 9), pixel_scale=0.2, centre=(0.1, -0.2))
+    mask = np.ones(image_grid.shape, dtype=bool)
+    mask[1:6, 2:8] = False
+    source_grid = source_grid_from_lens(
+        image_grid,
+        LensPlane((ZeroDeflection(),)),
+        shape=(11, 13),
+        mask=mask,
+        padding_fraction=0.1,
+    )
+
+    # Selected x spans 1.0 arcsec and y spans 0.8 arcsec. With 10% padding
+    # on each side, x sets the square-pixel scale: 1.2 / (13 - 1) = 0.1.
+    assert source_grid.centre == pytest.approx((0.2, -0.2))
+    assert source_grid.pixel_scale == pytest.approx(0.1)
+
+
+def test_source_grid_extent_can_ignore_coordinate_tails():
+    image_grid = CartesianGrid((5, 5), pixel_scale=1.0)
+    full = source_grid_from_lens(
+        image_grid, LensPlane((ZeroDeflection(),)), (5, 5), padding_fraction=0
+    )
+    trimmed = source_grid_from_lens(
+        image_grid,
+        LensPlane((ZeroDeflection(),)),
+        (5, 5),
+        padding_fraction=0,
+        exclude_ray_fraction=0.21,
+    )
+    assert trimmed.pixel_scale < full.pixel_scale
 
 
 def test_bilinear_interpolation_has_expected_weights_and_zero_outside():
