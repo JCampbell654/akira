@@ -12,6 +12,7 @@ from akira import (
     simulate_imaging,
 )
 from examples.fit_real_data import run
+from examples.fit_real_data_staged import STAGES, _build_stage_model, _starting_values
 
 
 def test_real_data_script_runs_fit_and_writes_outputs(tmp_path) -> None:
@@ -73,3 +74,43 @@ def test_real_data_script_runs_fit_and_writes_outputs(tmp_path) -> None:
     with np.load(output / "fit_arrays.npz", allow_pickle=False) as arrays:
         assert arrays["source"].shape == source_grid.shape
         assert arrays["model_image"].shape == image_grid.shape
+
+
+def test_staged_models_progressively_release_parameters() -> None:
+    free = lambda initial, lower, upper: {
+        "initial": initial,
+        "prior": {"type": "uniform", "lower": lower, "upper": upper},
+    }
+    config = {
+        "lens": {
+            "power_law": {
+                "einstein_radius": free(1.0, 0.5, 1.5),
+                "slope": free(2.0, 1.5, 2.5),
+                "centre_x": free(0.0, -0.2, 0.2),
+                "centre_y": free(0.0, -0.2, 0.2),
+                "q": free(0.8, 0.3, 1.0),
+                "phi": free(0.1, -1.5, 1.5),
+            },
+            "external_shear": {
+                "strength": free(0.03, 0.0, 0.2),
+                "phi": free(0.2, -1.5, 1.5),
+            },
+        },
+        "regularization": {"kind": "curvature"},
+    }
+    source_grid = SourceGrid((4, 4), 0.1)
+    values = _starting_values(config)
+    models = [
+        _build_stage_model(config, source_grid, values, stage_free, 10.0)
+        for _, stage_free in STAGES
+    ]
+
+    assert [len(model.parameter_names) for model in models] == [0, 2, 6, 8]
+    assert models[1].parameter_names == (
+        "lens.0.EllipticalPowerLaw.einstein_radius",
+        "lens.0.EllipticalPowerLaw.slope",
+    )
+    assert models[-1].parameter_names[-2:] == (
+        "lens.1.ExternalShear.strength",
+        "lens.1.ExternalShear.phi",
+    )

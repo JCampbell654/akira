@@ -156,6 +156,8 @@ def fit_pixelized_model(
     optimize_regularization_strength: bool = False,
     log_strength_bounds: tuple[float, float] = (-20.0, 30.0),
     progress_callback: Callable[[OptimizationProgress], None] | None = None,
+    max_iterations: int = 500,
+    max_line_search_steps: int = 20,
 ) -> PixelizedInferenceResult:
     """Optimize nonlinear lens parameters while solving source pixels linearly.
 
@@ -166,6 +168,8 @@ def fit_pixelized_model(
 
     if observation.data.shape != image_grid.shape:
         raise ValueError("Observation and image-grid shapes must match.")
+    if max_iterations < 1 or max_line_search_steps < 1:
+        raise ValueError("Optimizer iteration and line-search limits must be positive.")
     if objective not in ("evidence", "penalized", "profile_likelihood"):
         raise ValueError(
             "objective must be 'evidence', 'penalized', or 'profile_likelihood'."
@@ -286,7 +290,12 @@ def fit_pixelized_model(
         jac=True,
         method="L-BFGS-B",
         bounds=optimization_bounds,
-        options={"ftol": 1e-11, "gtol": 1e-7, "maxiter": 500},
+        options={
+            "ftol": 1e-11,
+            "gtol": 1e-7,
+            "maxiter": max_iterations,
+            "maxls": max_line_search_steps,
+        },
     )
     fitted = jnp.asarray(optimized.x, dtype=jnp.float64)
     model_fitted = fitted[:-1] if optimize_regularization_strength else fitted

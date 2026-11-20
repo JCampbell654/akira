@@ -138,6 +138,21 @@ starting an optimization with:
     --config examples/real_data_config.json --dry-run
 ```
 
+For a more robust nonlinear initialization, the staged workflow first
+optimizes regularization with the lens fixed, then releases radial mass
+parameters, lens centre/ellipticity, and external shear in four successive
+fits. Each stage starts from the preceding result, writes its own diagnostics,
+and stops before releasing more parameters if convergence fails:
+
+```bash
+.venv/bin/python examples/fit_real_data_staged.py \
+    --config examples/real_data_config.json
+```
+
+The staged script permits 100 line-search attempts by default, compared with
+20 in the one-shot workflow. Set `max_line_search_steps` in the configuration
+to override it.
+
 ## Tutorials
 
 The [`notebooks`](notebooks/) directory contains eight executable tutorials:
