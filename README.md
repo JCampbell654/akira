@@ -94,6 +94,26 @@ Run the elliptical analytic model and four-parameter recovery example with:
 .venv/bin/python examples/fit_epl_sersic.py
 ```
 
+## Fit real imaging
+
+Copy [`examples/real_data_config.json`](examples/real_data_config.json), point
+it at a two-dimensional image, noise map, normalized-or-unnormalized PSF and
+optional mask, then adjust the pixel scale, source grid, starting values and
+priors. Inputs can be FITS, NPY, NPZ, CSV or whitespace-delimited text. For
+FITS data, install the real-data extras and run:
+
+```bash
+.venv/bin/python -m pip install -e '.[real-data]'
+.venv/bin/python examples/fit_real_data.py --config my_config.json
+```
+
+The fit jointly optimizes all parameters marked with a prior and the logarithm
+of the regularization strength. It writes `fit_summary.json`, `fit_arrays.npz`,
+and `fit_diagnostics.png` to the configured output directory. Mask values that
+convert to `True` are excluded. Until simultaneous lens-light modelling is
+implemented, the input image should have foreground lens light subtracted or
+those pixels should be masked.
+
 ## Tutorials
 
 The [`notebooks`](notebooks/) directory contains eight executable tutorials:

@@ -1,0 +1,39 @@
+{
+  "data": {"path": "data/image.fits", "hdu": 0},
+  "noise_map": {"path": "data/noise_map.fits", "hdu": 0},
+  "psf": {"path": "data/psf.fits", "hdu": 0},
+  "mask": {"path": "data/mask.fits", "hdu": 0},
+  "pixel_scale": 0.05,
+  "supersampling": 1,
+  "source_grid": {
+    "shape": [20, 20],
+    "pixel_scale": 0.03,
+    "centre": [0.0, 0.0]
+  },
+  "lens": {
+    "power_law": {
+      "einstein_radius": {"initial": 1.0, "prior": {"type": "uniform", "lower": 0.5, "upper": 1.5}},
+      "slope": {"initial": 2.0, "prior": {"type": "uniform", "lower": 1.5, "upper": 2.5}},
+      "centre_x": {"initial": 0.0, "prior": {"type": "uniform", "lower": -0.2, "upper": 0.2}},
+      "centre_y": {"initial": 0.0, "prior": {"type": "uniform", "lower": -0.2, "upper": 0.2}},
+      "q": {"initial": 0.8, "prior": {"type": "uniform", "lower": 0.3, "upper": 1.0}},
+      "phi": {"initial": 0.0, "prior": {"type": "uniform", "lower": -1.5707963267948966, "upper": 1.5707963267948966}}
+    },
+    "external_shear": {
+      "strength": {"initial": 0.03, "prior": {"type": "uniform", "lower": 0.0, "upper": 0.2}},
+      "phi": {"initial": 0.0, "prior": {"type": "uniform", "lower": -1.5707963267948966, "upper": 1.5707963267948966}},
+      "centre": [0.0, 0.0]
+    }
+  },
+  "regularization": {
+    "kind": "curvature",
+    "initial_strength": 50.0,
+    "strength_bounds": [0.001, 1000000.0]
+  },
+  "caustic_grid": {
+    "shape": [301, 301],
+    "pixel_scale": 0.01,
+    "centre": [0.0, 0.0]
+  },
+  "output_directory": "fit_output"
+}
