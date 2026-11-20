@@ -187,7 +187,7 @@ def fit_pixelized_model(
             )
         lower_log, upper_log = log_strength_bounds
         initial_log = math.log(model.regularization_strength)
-        if not lower_log < initial_log < upper_log:
+        if not lower_log <= initial_log <= upper_log:
             raise ValueError("Initial log regularization strength lies outside bounds.")
     regularization = regularization_matrix(
         model.source_grid, model.regularization_kind

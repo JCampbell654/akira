@@ -258,7 +258,28 @@ def run(config_path: Path, dry_run: bool = False) -> int:
         )
         print(f"Stage result: success={result.success}; {result.message}", flush=True)
         _update_values(values, result)
-        strength = result.regularization_strength
+        # exp(log_bound) can differ from the original bound by a few ulps.
+        # Clamp that harmless roundoff before using the result as the next
+        # stage's initial value.
+        strength = min(
+            max(result.regularization_strength, float(strength_bounds[0])),
+            float(strength_bounds[1]),
+        )
+        fitted_log_strength = math.log(strength)
+        log_span = log_bounds[1] - log_bounds[0]
+        boundary_tolerance = max(1e-8, 1e-6 * log_span)
+        if min(
+            fitted_log_strength - log_bounds[0],
+            log_bounds[1] - fitted_log_strength,
+        ) <= boundary_tolerance:
+            boundary = "lower" if fitted_log_strength < sum(log_bounds) / 2 else "upper"
+            print(
+                f"WARNING: regularization strength is at its {boundary} bound "
+                f"({strength:.8g}). This is a constrained optimum, not an "
+                "interior regularization solution. The next stage will continue "
+                "from this bound while releasing additional lens parameters.",
+                flush=True,
+            )
         final_result = result
         if not result.success:
             print(

@@ -156,6 +156,19 @@ def test_joint_lens_and_log_regularization_optimization():
     assert float(result.parameter_vector[1]) == pytest.approx(2.08, abs=0.012)
 
 
+def test_regularization_optimization_accepts_initial_value_at_log_bound():
+    image_grid, source_grid, observation = make_problem()
+    result = fit_pixelized_model(
+        make_model(source_grid, strength=1000.0),
+        observation,
+        image_grid,
+        objective="evidence",
+        optimize_regularization_strength=True,
+        log_strength_bounds=(np.log(1.0), np.log(1000.0)),
+    )
+    assert np.isfinite(result.regularization_strength)
+
+
 def test_fit_reports_objective_evaluation_progress():
     image_grid, source_grid, observation = make_problem()
     updates = []
