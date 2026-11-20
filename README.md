@@ -54,6 +54,20 @@ The seventh implements Suyu-style Bayesian regularization selection: proper
 boundary-treated gradient and curvature priors, direct optimization in
 log-strength, effective source dimension, stationarity diagnostics, and
 evidence-based comparison of regularization forms.
+The lens-mapping Jacobian can also be evaluated on a fine image-plane grid to
+find critical curves and ray-trace them into source-plane caustics. These can
+be overlaid on any analytic or pixelized source plot:
+
+```python
+from akira import CartesianGrid, find_lensing_curves, plot_caustics
+
+search_grid = CartesianGrid((301, 301), pixel_scale=0.01)
+curves = find_lensing_curves(lens, search_grid)
+plot_caustics(axis, curves, color="cyan")
+```
+
+The search grid is independent of the data grid: make it fine enough to trace
+the curve smoothly and wide enough to contain all critical curves.
 
 Run the tests from the repository root:
 

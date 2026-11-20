@@ -5,6 +5,12 @@ from akira._precision import enable_float64 as _enable_float64
 _enable_float64()
 
 from akira.coordinates import CartesianGrid, degrees_to_radians, radians_to_degrees
+from akira.caustics import (
+    LensingCurves,
+    find_lensing_curves,
+    lens_mapping_determinant,
+    plot_caustics,
+)
 from akira.fit import (
     EPLSersicFitResult,
     EPLSersicParameters,
@@ -73,6 +79,7 @@ __all__ = [
     "GaussianPrior",
     "ImagingObservation",
     "LensPlane",
+    "LensingCurves",
     "LensModel",
     "LogUniformPrior",
     "InferenceResult",
@@ -92,6 +99,7 @@ __all__ = [
     "apply_psf_to_operator",
     "bilinear_interpolation_matrix",
     "fit_sis_einstein_radius",
+    "find_lensing_curves",
     "fit_model",
     "fit_pixelized_model",
     "forward_operator",
@@ -100,7 +108,9 @@ __all__ = [
     "gaussian_source_log_evidence",
     "gaussian_psf",
     "lensing_operator",
+    "lens_mapping_determinant",
     "optimize_regularization",
+    "plot_caustics",
     "radians_to_degrees",
     "ray_trace",
     "reconstruct_source",
