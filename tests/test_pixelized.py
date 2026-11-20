@@ -78,14 +78,19 @@ def test_regularization_matrices_equal_explicit_penalties():
     zeroth = np.asarray(regularization_matrix(grid, "zeroth"))
     gradient = np.asarray(regularization_matrix(grid, "gradient"))
     curvature = np.asarray(regularization_matrix(grid, "curvature"))
-    expected_gradient = np.sum(np.diff(source, axis=0) ** 2) + np.sum(
-        np.diff(source, axis=1) ** 2
+    expected_gradient = (
+        np.sum(np.diff(source, axis=0) ** 2)
+        + np.sum(np.diff(source, axis=1) ** 2)
+        + np.sum(source[:, -1] ** 2)
+        + np.sum(source[-1, :] ** 2)
     )
     expected_curvature = np.sum(
-        (source[:, 1:-1] - 0.5 * (source[:, :-2] + source[:, 2:])) ** 2
+        np.diff(source, n=2, axis=1) ** 2
     ) + np.sum(
-        (source[1:-1] - 0.5 * (source[:-2] + source[2:])) ** 2
-    )
+        np.diff(source, n=2, axis=0) ** 2
+    ) + np.sum(np.diff(source[:, -2:], axis=1) ** 2) + np.sum(
+        np.diff(source[-2:, :], axis=0) ** 2
+    ) + np.sum(source[:, -1] ** 2) + np.sum(source[-1, :] ** 2)
     assert flat @ zeroth @ flat == pytest.approx(np.sum(source**2))
     assert flat @ gradient @ flat == pytest.approx(expected_gradient)
     assert flat @ curvature @ flat == pytest.approx(expected_curvature)
@@ -121,10 +126,8 @@ def test_reconstruction_solves_normal_equations(kind):
     )
     assert np.asarray(result.source) == pytest.approx(source, abs=1e-8)
     assert result.source_covariance.shape == (16, 16)
-    if kind == "zeroth":
-        assert result.log_evidence is not None
-    else:
-        assert result.log_evidence is None
+    assert result.log_evidence is not None
+    assert result.posterior_covariance.shape == (16, 16)
 
 
 def test_zeroth_order_log_evidence_matches_direct_gaussian_marginal():

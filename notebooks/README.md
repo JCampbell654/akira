@@ -21,6 +21,9 @@ Run them in order for the most natural introduction:
 7. `07_free_lens_pixelized_inference.ipynb` optimizes nonlinear power-law lens
    parameters while solving and marginalizing a pixelized source at every
    evaluation.
+8. `08_optimize_regularization.ipynb` optimizes log regularization strength,
+   reports the effective source dimension and Suyu stationarity condition, and
+   evidence-ranks proper zeroth, gradient, and curvature priors.
 
 Install the notebook dependencies into the project environment with:
 

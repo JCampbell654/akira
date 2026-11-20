@@ -101,15 +101,16 @@ def test_evidence_fit_recovers_free_lens_parameters():
     assert result.covariance.shape == (2, 2)
 
 
-def test_singular_regularization_is_rejected_for_evidence():
+def test_suyu_gradient_regularization_supports_evidence():
     image_grid, source_grid, observation = make_problem()
-    with pytest.raises(ValueError, match="positive-definite"):
-        fit_pixelized_model(
-            make_model(source_grid, kind="gradient"),
-            observation,
-            image_grid,
-            objective="evidence",
-        )
+    result = fit_pixelized_model(
+        make_model(source_grid, kind="gradient"),
+        observation,
+        image_grid,
+        objective="evidence",
+    )
+    assert result.success
+    assert result.log_source_evidence is not None
 
 
 def test_gradient_regularization_can_use_profile_likelihood():
@@ -135,6 +136,24 @@ def test_gradient_regularization_can_use_profile_likelihood():
     assert result.success
     assert float(result.parameter_vector[0]) == pytest.approx(0.72, abs=0.003)
     assert result.log_source_evidence is None
+
+
+def test_joint_lens_and_log_regularization_optimization():
+    image_grid, source_grid, observation = make_problem()
+    result = fit_pixelized_model(
+        make_model(source_grid),
+        observation,
+        image_grid,
+        objective="evidence",
+        optimize_regularization_strength=True,
+        log_strength_bounds=(-8.0, 15.0),
+    )
+    assert result.success
+    assert result.parameter_names[-1] == "regularization.log_strength"
+    assert result.regularization_strength > 0.0
+    assert abs(result.stationarity_residual) < 5e-4
+    assert float(result.parameter_vector[0]) == pytest.approx(0.72, abs=0.001)
+    assert float(result.parameter_vector[1]) == pytest.approx(2.08, abs=0.012)
 
 
 def test_invalid_objective_and_empty_free_parameter_set_are_rejected():

@@ -146,11 +146,11 @@ covariance, image diagnostics, and a differentiable lower-level solve. Treat
 this as the inspectable correctness reference for a future sparse or
 matrix-free production implementation.
 
-Absolute Gaussian evidence is reported only when the regularization matrix is
-positive definite. Zeroth-order regularization meets this condition. The
-current gradient and curvature matrices contain constant or planar null modes,
-so their priors are improper and their absolute evidence is deliberately left
-undefined until explicit boundary or null-space conventions are adopted.
+Gradient and curvature regularization follow equations A2 and A3 of Suyu et
+al. (2006). Their top/right boundary terms express zero intensity immediately
+outside the finite source grid, remove constant and planar null modes, and make
+the Hessians positive definite. All three implemented forms therefore define
+normalized Gaussian priors suitable for absolute evidence comparison.
 
 ### 2026-11-19 — Nonlinear lens inference coupled to pixelized sources
 
@@ -161,5 +161,16 @@ complete calculation with JAX. Provide source-marginalized Gaussian evidence,
 penalized likelihood, and profile likelihood objectives. All objectives add
 the declared nonlinear priors, producing MAP lens estimates. Permit the
 regularization strength to be fixed or declared as another free parameter.
-Restrict the evidence objective to positive-definite regularization while
-allowing singular gradient and curvature forms with the diagnostic objectives.
+Require positive-definite regularization for evidence objectives; the adopted
+Suyu boundary conventions satisfy this for all three implemented forms.
+
+### 2026-11-20 — Bayesian regularization strength selection implemented
+
+Optimize the regularization hyperparameter in `log(lambda)` using the exact
+Gaussian source evidence for a fixed lens, with an optional joint lens and
+log-strength path. Report the effective source dimension
+`gamma = Ns - lambda*Tr(A^-1 H)` and the residual of the Suyu equation-20
+stationarity condition `lambda*s^T H s = gamma`. Compare regularization forms
+only after optimizing their individual strengths. Retain explicit optimizer
+success and stationarity diagnostics because the bilinear mapping is piecewise
+differentiable at source-pixel boundaries.

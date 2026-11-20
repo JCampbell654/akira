@@ -53,6 +53,11 @@ from akira.profiles import (
     Sersic,
 )
 from akira.render import render, render_sis_gaussian
+from akira.regularization import (
+    RegularizationOptimization,
+    gaussian_source_log_evidence,
+    optimize_regularization,
+)
 from akira.simulate import simulate_imaging
 
 __all__ = [
@@ -77,6 +82,7 @@ __all__ = [
     "PixelizedInferenceResult",
     "PixelizedLensModel",
     "ProfileModel",
+    "RegularizationOptimization",
     "SIS",
     "Sersic",
     "SourceGrid",
@@ -91,8 +97,10 @@ __all__ = [
     "forward_operator",
     "fit_epl_sersic_parameters",
     "gaussian_log_likelihood",
+    "gaussian_source_log_evidence",
     "gaussian_psf",
     "lensing_operator",
+    "optimize_regularization",
     "radians_to_degrees",
     "ray_trace",
     "reconstruct_source",

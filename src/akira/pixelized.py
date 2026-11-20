@@ -141,7 +141,13 @@ def regularization_matrix(
     source_grid: SourceGrid,
     kind: RegularizationKind,
 ) -> Array:
-    """Return Warren--Dye zeroth, gradient, or curvature regularization H."""
+    """Return the proper Suyu et al. zeroth, gradient, or curvature Hessian.
+
+    Gradient and curvature include the top/right boundary terms from equations
+    A2 and A3 of Suyu et al. (2006). These encode zero intensity immediately
+    outside those boundaries and make every matrix positive definite, which is
+    required for normalized Gaussian evidence comparisons.
+    """
 
     ny, nx = source_grid.shape
     size = source_grid.size
@@ -161,21 +167,47 @@ def regularization_matrix(
                 row[y * nx + x] = 1.0
                 row[(y + 1) * nx + x] = -1.0
                 rows.append(row)
+        for y in range(ny):
+            row = np.zeros(size)
+            row[y * nx + (nx - 1)] = 1.0
+            rows.append(row)
+        for x in range(nx):
+            row = np.zeros(size)
+            row[(ny - 1) * nx + x] = 1.0
+            rows.append(row)
     elif kind == "curvature":
         for y in range(ny):
-            for x in range(1, nx - 1):
+            for x in range(nx - 2):
                 row = np.zeros(size)
                 row[y * nx + x] = 1.0
-                row[y * nx + x - 1] = -0.5
-                row[y * nx + x + 1] = -0.5
+                row[y * nx + x + 1] = -2.0
+                row[y * nx + x + 2] = 1.0
                 rows.append(row)
-        for y in range(1, ny - 1):
+        for y in range(ny - 2):
             for x in range(nx):
                 row = np.zeros(size)
                 row[y * nx + x] = 1.0
-                row[(y - 1) * nx + x] = -0.5
-                row[(y + 1) * nx + x] = -0.5
+                row[(y + 1) * nx + x] = -2.0
+                row[(y + 2) * nx + x] = 1.0
                 rows.append(row)
+        for y in range(ny):
+            row = np.zeros(size)
+            row[y * nx + (nx - 2)] = 1.0
+            row[y * nx + (nx - 1)] = -1.0
+            rows.append(row)
+        for x in range(nx):
+            row = np.zeros(size)
+            row[(ny - 2) * nx + x] = 1.0
+            row[(ny - 1) * nx + x] = -1.0
+            rows.append(row)
+        for y in range(ny):
+            row = np.zeros(size)
+            row[y * nx + (nx - 1)] = 1.0
+            rows.append(row)
+        for x in range(nx):
+            row = np.zeros(size)
+            row[(ny - 1) * nx + x] = 1.0
+            rows.append(row)
     else:
         raise ValueError("kind must be 'zeroth', 'gradient', or 'curvature'.")
     difference = jnp.asarray(np.stack(rows), dtype=jnp.float64)
@@ -194,6 +226,7 @@ class PixelizedReconstruction:
     regularization: Array
     system_matrix: Array
     source_covariance: Array
+    posterior_covariance: Array
     chi_squared: float
     regularization_penalty: float
     log_evidence: float | None
@@ -315,6 +348,7 @@ def reconstruct_from_operator(
         regularization,
         regularization_strength,
     )
+    posterior_covariance = jnp.linalg.inv(system)
     flat_model = operator @ source
     model_image = flat_model.reshape(observation.data.shape)
     residuals = (observation.data - model_image) / observation.noise_map
@@ -339,6 +373,7 @@ def reconstruct_from_operator(
         regularization=regularization,
         system_matrix=system,
         source_covariance=covariance,
+        posterior_covariance=posterior_covariance,
         chi_squared=float(chi_squared),
         regularization_penalty=float(penalty),
         log_evidence=log_evidence,

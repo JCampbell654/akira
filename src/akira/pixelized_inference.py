@@ -107,6 +107,9 @@ class PixelizedInferenceResult:
     message: str
     evaluations: int
     covariance: Array | None
+    regularization_strength: float
+    effective_source_parameters: float | None
+    stationarity_residual: float | None
 
 
 def _log_source_evidence(
@@ -138,6 +141,8 @@ def fit_pixelized_model(
     observation: ImagingObservation,
     image_grid: CartesianGrid,
     objective: PixelizedObjective = "evidence",
+    optimize_regularization_strength: bool = False,
+    log_strength_bounds: tuple[float, float] = (-20.0, 30.0),
 ) -> PixelizedInferenceResult:
     """Optimize nonlinear lens parameters while solving source pixels linearly.
 
@@ -153,8 +158,20 @@ def fit_pixelized_model(
             "objective must be 'evidence', 'penalized', or 'profile_likelihood'."
         )
     parameter_items = model.parameter_items
-    if not parameter_items:
+    if not parameter_items and not optimize_regularization_strength:
         raise ValueError("PixelizedLensModel contains no free parameters.")
+    if optimize_regularization_strength:
+        if objective != "evidence":
+            raise ValueError("Regularization optimization requires objective='evidence'.")
+        if isinstance(model.regularization_strength, FreeParameter):
+            raise ValueError(
+                "Use a fixed positive initial regularization_strength when "
+                "optimizing it in log space."
+            )
+        lower_log, upper_log = log_strength_bounds
+        initial_log = math.log(model.regularization_strength)
+        if not lower_log < initial_log < upper_log:
+            raise ValueError("Initial log regularization strength lies outside bounds.")
     regularization = regularization_matrix(
         model.source_grid, model.regularization_kind
     )
@@ -179,7 +196,10 @@ def fit_pixelized_model(
     noise = all_noise[active_indices]
 
     def components(values: Array):
-        lens, strength = model.build(values)
+        model_values = values[:-1] if optimize_regularization_strength else values
+        lens, strength = model.build(model_values)
+        if optimize_regularization_strength:
+            strength = jnp.exp(values[-1])
         full_operator = forward_operator(
             image_grid,
             model.source_grid,
@@ -204,7 +224,7 @@ def fit_pixelized_model(
             regularization,
             strength,
         )
-        log_prior = model.log_prior(values)
+        log_prior = model.log_prior(model_values)
         return full_operator, source, log_likelihood, penalty, evidence, log_prior
 
     def negative_target(values: Array) -> Array:
@@ -223,16 +243,28 @@ def fit_pixelized_model(
         value, gradient = value_and_gradient(jnp.asarray(values, dtype=jnp.float64))
         return float(value), np.asarray(gradient, dtype=np.float64)
 
+    initial_values = np.asarray(model.initial_vector, dtype=np.float64)
+    optimization_bounds = [
+        parameter.prior.bounds for _, parameter in parameter_items
+    ]
+    optimization_names = model.parameter_names
+    if optimize_regularization_strength:
+        initial_values = np.concatenate((initial_values, [initial_log]))
+        optimization_bounds.append(log_strength_bounds)
+        optimization_names = optimization_names + ("regularization.log_strength",)
     optimized = minimize(
         scipy_objective,
-        x0=np.asarray(model.initial_vector, dtype=np.float64),
+        x0=initial_values,
         jac=True,
         method="L-BFGS-B",
-        bounds=[parameter.prior.bounds for _, parameter in parameter_items],
+        bounds=optimization_bounds,
         options={"ftol": 1e-11, "gtol": 1e-7, "maxiter": 500},
     )
     fitted = jnp.asarray(optimized.x, dtype=jnp.float64)
-    lens, strength = model.build(fitted)
+    model_fitted = fitted[:-1] if optimize_regularization_strength else fitted
+    lens, strength = model.build(model_fitted)
+    if optimize_regularization_strength:
+        strength = jnp.exp(fitted[-1])
     full_operator, _, log_likelihood, _, evidence, log_prior = components(fitted)
     reconstruction = reconstruct_from_operator(
         observation,
@@ -255,10 +287,26 @@ def fit_pixelized_model(
         )
     else:
         source_objective = log_likelihood
+    effective_parameters = None
+    stationarity_residual = None
+    if objective == "evidence":
+        inverse_system = reconstruction.posterior_covariance
+        source_vector = reconstruction.source.reshape(-1)
+        effective_parameters_array = model.source_grid.size - strength * jnp.trace(
+            inverse_system @ regularization
+        )
+        stationarity_array = (
+            strength * source_vector @ regularization @ source_vector
+            - effective_parameters_array
+        )
+        effective_parameters = float(effective_parameters_array)
+        stationarity_residual = float(stationarity_array)
+    parameter_values = dict(zip(optimization_names, map(float, optimized.x)))
+    parameter_values["regularization.strength"] = float(strength)
     return PixelizedInferenceResult(
-        parameter_names=model.parameter_names,
+        parameter_names=optimization_names,
         parameter_vector=fitted,
-        parameters=dict(zip(model.parameter_names, map(float, optimized.x))),
+        parameters=parameter_values,
         lens=lens,
         reconstruction=reconstruction,
         log_likelihood=float(log_likelihood),
@@ -270,4 +318,7 @@ def fit_pixelized_model(
         message=str(optimized.message),
         evaluations=int(optimized.nfev),
         covariance=covariance,
+        regularization_strength=float(strength),
+        effective_source_parameters=effective_parameters,
+        stationarity_residual=stationarity_residual,
     )
