@@ -137,6 +137,70 @@ def forward_operator(
     )
 
 
+def masked_forward_operator(
+    image_grid: CartesianGrid,
+    source_grid: SourceGrid,
+    lens: LensPlane,
+    psf_kernel: Array,
+    mask: Array,
+) -> Array:
+    """Return PSF-convolved operator rows only for unmasked image pixels.
+
+    The PSF requires unconvolved values around each active output pixel. Only
+    the union of those footprints is ray-traced; pixels outside it are never
+    represented in a dense image-by-source matrix. Rows follow flattened
+    image order with masked rows omitted.
+    """
+
+    mask_array = np.asarray(mask, dtype=bool)
+    if mask_array.shape != image_grid.shape:
+        raise ValueError("mask and image-grid shapes must match.")
+    kernel = np.asarray(psf_kernel, dtype=np.float64)
+    if kernel.ndim != 2 or any(size % 2 == 0 for size in kernel.shape):
+        raise ValueError("psf_kernel must have odd two-dimensional shape.")
+    ny, nx = image_grid.shape
+    active = np.flatnonzero(~mask_array.reshape(-1))
+    output_y, output_x = np.divmod(active, nx)
+    centre_y, centre_x = kernel.shape[0] // 2, kernel.shape[1] // 2
+    input_indices: list[np.ndarray] = []
+    footprint_weights: list[np.ndarray] = []
+    for kernel_y, kernel_x in zip(*np.nonzero(kernel)):
+        # scipy.signal.convolve2d uses the reversed convolution offset.
+        input_y = output_y + centre_y - kernel_y
+        input_x = output_x + centre_x - kernel_x
+        valid = (input_y >= 0) & (input_y < ny) & (input_x >= 0) & (input_x < nx)
+        indices = np.where(valid, input_y * nx + input_x, 0)
+        input_indices.append(indices)
+        footprint_weights.append(kernel[kernel_y, kernel_x] * valid)
+    footprint = np.stack(input_indices, axis=1)
+    weights = np.stack(footprint_weights, axis=1)
+    valid_flat = footprint[weights != 0]
+    support_indices = np.unique(valid_flat)
+    support_lookup = np.full(ny * nx, -1, dtype=np.int64)
+    support_lookup[support_indices] = np.arange(support_indices.size)
+    footprint_lookup = support_lookup[footprint]
+    footprint_lookup = np.where(weights != 0, footprint_lookup, 0)
+
+    all_coordinates = image_grid.subpixel_coordinates().reshape(
+        (-1, image_grid.supersampling**2, 2)
+    )
+    image_coordinates = all_coordinates[jnp.asarray(support_indices)]
+    source_coordinates = ray_trace(
+        image_coordinates, lens.deflection(image_coordinates)
+    )
+    interpolation = bilinear_interpolation_matrix(source_coordinates, source_grid)
+    support_operator = interpolation.mean(axis=1)
+    lookup = jnp.asarray(footprint_lookup, dtype=jnp.int32)
+    weights_array = jnp.asarray(weights, dtype=jnp.float64)
+
+    def add_footprint(index: int, operator: Array) -> Array:
+        rows = support_operator[lookup[:, index]]
+        return operator + weights_array[:, index, None] * rows
+
+    initial = jnp.zeros((active.size, source_grid.size), dtype=jnp.float64)
+    return jax.lax.fori_loop(0, weights.shape[1], add_footprint, initial)
+
+
 def regularization_matrix(
     source_grid: SourceGrid,
     kind: RegularizationKind,
@@ -359,6 +423,66 @@ def reconstruct_from_operator(
         active_data,
         active_noise,
         active_operator,
+        source,
+        system,
+        regularization,
+        regularization_strength,
+    )
+    return PixelizedReconstruction(
+        source=source.reshape(source_grid.shape),
+        model_image=model_image,
+        residuals=residuals,
+        operator=operator,
+        data_curvature=data_curvature,
+        regularization=regularization,
+        system_matrix=system,
+        source_covariance=covariance,
+        posterior_covariance=posterior_covariance,
+        chi_squared=float(chi_squared),
+        regularization_penalty=float(penalty),
+        log_evidence=log_evidence,
+        regularization_kind=regularization_kind,
+        regularization_strength=regularization_strength,
+    )
+
+
+def reconstruct_from_masked_operator(
+    observation: ImagingObservation,
+    source_grid: SourceGrid,
+    operator: Array,
+    regularization_kind: RegularizationKind = "gradient",
+    regularization_strength: float = 1.0,
+) -> PixelizedReconstruction:
+    """Reconstruct from an operator containing only unmasked output rows."""
+
+    active = ~observation.mask.reshape(-1)
+    active_count = int(jnp.sum(active))
+    expected_shape = (active_count, source_grid.size)
+    if operator.shape != expected_shape:
+        raise ValueError(f"operator must have shape {expected_shape}.")
+    if not math.isfinite(regularization_strength) or regularization_strength <= 0:
+        raise ValueError("regularization_strength must be positive and finite.")
+    data = observation.data.reshape(-1)[active]
+    noise = observation.noise_map.reshape(-1)[active]
+    regularization = regularization_matrix(source_grid, regularization_kind)
+    source, data_curvature, system, covariance = solve_source(
+        operator, data, noise, regularization, regularization_strength
+    )
+    posterior_covariance = jnp.linalg.inv(system)
+    active_model = operator @ source
+    flat_model = jnp.zeros(observation.data.size, dtype=jnp.float64)
+    flat_model = flat_model.at[active].set(active_model)
+    model_image = flat_model.reshape(observation.data.shape)
+    active_residuals = (data - active_model) / noise
+    flat_residuals = jnp.zeros(observation.data.size, dtype=jnp.float64)
+    flat_residuals = flat_residuals.at[active].set(active_residuals)
+    residuals = flat_residuals.reshape(observation.data.shape)
+    chi_squared = jnp.sum(active_residuals**2)
+    penalty = source @ regularization @ source
+    log_evidence = _proper_gaussian_log_evidence(
+        data,
+        noise,
+        operator,
         source,
         system,
         regularization,

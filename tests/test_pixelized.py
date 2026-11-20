@@ -17,6 +17,10 @@ from akira import (
     bilinear_interpolation_matrix,
     gaussian_psf,
     lensing_operator,
+    masked_forward_operator,
+    forward_operator,
+    reconstruct_from_masked_operator,
+    reconstruct_from_operator,
     reconstruct_source,
     regularization_matrix,
     solve_source,
@@ -69,6 +73,51 @@ def test_psf_operator_matches_column_by_column_convolution():
     expected = np.zeros(image_shape)
     expected[1:4, 1:4] = np.asarray(psf.kernel)
     assert central_column == pytest.approx(expected)
+
+
+def test_masked_operator_matches_active_rows_of_full_psf_operator():
+    image_grid = CartesianGrid((7, 8), pixel_scale=0.2)
+    source_grid = SourceGrid((5, 6), pixel_scale=0.22)
+    lens = LensPlane((ZeroDeflection(),))
+    kernel = np.asarray(
+        [[0.01, 0.03, 0.04], [0.08, 0.50, 0.12], [0.06, 0.10, 0.06]]
+    )
+    mask = np.ones(image_grid.shape, dtype=bool)
+    mask[1:6, 2:7] = False
+    mask[3, 4] = True
+
+    full = forward_operator(image_grid, source_grid, lens, kernel)
+    masked = masked_forward_operator(image_grid, source_grid, lens, kernel, mask)
+
+    np.testing.assert_allclose(masked, np.asarray(full)[~mask.reshape(-1)], atol=1e-14)
+
+
+def test_masked_reconstruction_matches_full_reconstruction_on_active_pixels():
+    image_grid = CartesianGrid((7, 7), pixel_scale=0.2)
+    source_grid = SourceGrid((5, 5), pixel_scale=0.2)
+    lens = LensPlane((ZeroDeflection(),))
+    psf = gaussian_psf(0.6, 3)
+    mask = np.ones(image_grid.shape, dtype=bool)
+    mask[1:6, 1:6] = False
+    data = np.arange(49, dtype=np.float64).reshape(7, 7) / 50
+    observation = ImagingObservation(data, np.full((7, 7), 0.1), psf, 0.2, mask)
+    full_operator = forward_operator(image_grid, source_grid, lens, psf.kernel)
+    active_operator = masked_forward_operator(
+        image_grid, source_grid, lens, psf.kernel, mask
+    )
+
+    full = reconstruct_from_operator(
+        observation, source_grid, full_operator, "zeroth", 2.0
+    )
+    active = reconstruct_from_masked_operator(
+        observation, source_grid, active_operator, "zeroth", 2.0
+    )
+
+    np.testing.assert_allclose(active.source, full.source, atol=1e-12)
+    np.testing.assert_allclose(active.chi_squared, full.chi_squared, atol=1e-12)
+    np.testing.assert_allclose(
+        np.asarray(active.model_image)[~mask], np.asarray(full.model_image)[~mask]
+    )
 
 
 def test_regularization_matrices_equal_explicit_penalties():

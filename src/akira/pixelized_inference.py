@@ -20,8 +20,8 @@ from akira.pixelized import (
     PixelizedReconstruction,
     RegularizationKind,
     SourceGrid,
-    forward_operator,
-    reconstruct_from_operator,
+    masked_forward_operator,
+    reconstruct_from_masked_operator,
     regularization_matrix,
     solve_source,
 )
@@ -187,26 +187,22 @@ def fit_pixelized_model(
                 "Evidence requires positive-definite regularization; use zeroth "
                 "order or choose a non-evidence objective."
             )
-    active_indices = jnp.asarray(
-        np.flatnonzero(~np.asarray(observation.mask).reshape(-1)), dtype=jnp.int32
-    )
-    all_data = observation.data.reshape(-1)
-    all_noise = observation.noise_map.reshape(-1)
-    data = all_data[active_indices]
-    noise = all_noise[active_indices]
+    active = ~observation.mask.reshape(-1)
+    data = observation.data.reshape(-1)[active]
+    noise = observation.noise_map.reshape(-1)[active]
 
     def components(values: Array):
         model_values = values[:-1] if optimize_regularization_strength else values
         lens, strength = model.build(model_values)
         if optimize_regularization_strength:
             strength = jnp.exp(values[-1])
-        full_operator = forward_operator(
+        operator = masked_forward_operator(
             image_grid,
             model.source_grid,
             lens,
             observation.psf.kernel,
+            observation.mask,
         )
-        operator = full_operator[active_indices]
         source, _, system, _ = solve_source(
             operator, data, noise, regularization, strength
         )
@@ -225,7 +221,7 @@ def fit_pixelized_model(
             strength,
         )
         log_prior = model.log_prior(model_values)
-        return full_operator, source, log_likelihood, penalty, evidence, log_prior
+        return operator, source, log_likelihood, penalty, evidence, log_prior
 
     def negative_target(values: Array) -> Array:
         _, _, log_likelihood, penalty, evidence, log_prior = components(values)
@@ -265,11 +261,11 @@ def fit_pixelized_model(
     lens, strength = model.build(model_fitted)
     if optimize_regularization_strength:
         strength = jnp.exp(fitted[-1])
-    full_operator, _, log_likelihood, _, evidence, log_prior = components(fitted)
-    reconstruction = reconstruct_from_operator(
+    operator, _, log_likelihood, _, evidence, log_prior = components(fitted)
+    reconstruction = reconstruct_from_masked_operator(
         observation,
         model.source_grid,
-        full_operator,
+        operator,
         model.regularization_kind,
         float(strength),
     )

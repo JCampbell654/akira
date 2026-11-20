@@ -18,6 +18,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.signal import convolve2d
 
 from akira import (
     CartesianGrid,
@@ -142,6 +143,39 @@ def _make_model(config: dict[str, Any], source_grid: SourceGrid) -> PixelizedLen
     )
 
 
+def _report_memory_scale(
+    observation: ImagingObservation,
+    source_grid: SourceGrid,
+    supersampling: int,
+) -> None:
+    mask = np.asarray(observation.mask)
+    active = ~mask
+    footprint = convolve2d(
+        active.astype(np.uint8),
+        np.ones(observation.psf.kernel.shape, dtype=np.uint8),
+        mode="same",
+    ) > 0
+    active_pixels = int(active.sum())
+    support_pixels = int(footprint.sum())
+    bytes_per_matrix = active_pixels * source_grid.size * 8
+    support_bytes = support_pixels * source_grid.size * supersampling**2 * 8
+    print(
+        f"Using {active_pixels:,} of {mask.size:,} image pixels; "
+        f"PSF support covers {support_pixels:,} pixels."
+    )
+    print(
+        "Approximate base dense storage: "
+        f"operator {bytes_per_matrix / 2**20:.1f} MiB, "
+        f"ray-tracing workspace {support_bytes / 2**20:.1f} MiB."
+    )
+    if bytes_per_matrix + support_bytes > 6 * 2**30:
+        raise MemoryError(
+            "This masked configuration still needs more than 6 GiB for its two "
+            "base matrices before differentiation. Reduce the source-grid size, "
+            "supersampling, PSF footprint, or number of unmasked pixels."
+        )
+
+
 def _save_results(
     output_directory: Path,
     config: dict[str, Any],
@@ -257,6 +291,7 @@ def run(config_path: Path) -> int:
         tuple(source_config.get("centre", (0.0, 0.0))),
     )
     model = _make_model(config, source_grid)
+    _report_memory_scale(observation, source_grid, image_grid.supersampling)
     strength_bounds = config["regularization"]["strength_bounds"]
     if strength_bounds[0] <= 0 or strength_bounds[0] >= strength_bounds[1]:
         raise ValueError("regularization strength_bounds must be positive and ordered.")

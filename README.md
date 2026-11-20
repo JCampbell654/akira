@@ -114,6 +114,12 @@ convert to `True` are excluded. Until simultaneous lens-light modelling is
 implemented, the input image should have foreground lens light subtracted or
 those pixels should be masked.
 
+For large observations, the nonlinear fit constructs operator rows only for
+unmasked pixels. It additionally ray-traces the union of their local PSF
+footprints, because flux from a neighbouring masked pixel can contribute to an
+unmasked detector pixel after convolution. The script reports both dimensions
+and an approximate base-memory cost before optimization begins.
+
 ## Tutorials
 
 The [`notebooks`](notebooks/) directory contains eight executable tutorials:
