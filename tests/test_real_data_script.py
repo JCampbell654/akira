@@ -11,7 +11,8 @@ from akira import (
     lensing_operator,
     simulate_imaging,
 )
-from examples.fit_real_data import run
+from examples.fit_real_data import _make_model, run
+from examples.reconstruct_fixed_lens import run as run_fixed
 from examples.fit_real_data_staged import STAGES, _build_stage_model, _starting_values
 
 
@@ -74,6 +75,78 @@ def test_real_data_script_runs_fit_and_writes_outputs(tmp_path) -> None:
     with np.load(output / "fit_arrays.npz", allow_pickle=False) as arrays:
         assert arrays["source"].shape == source_grid.shape
         assert arrays["model_image"].shape == image_grid.shape
+
+
+def test_fixed_lens_script_reconstructs_without_optimization(tmp_path) -> None:
+    image_grid = CartesianGrid((14, 14), 0.12)
+    source_grid = SourceGrid((4, 4), 0.12)
+    lens = LensPlane((EllipticalPowerLaw(0.58, 2.0, q=0.82, phi=0.2),))
+    source = np.exp(
+        -np.sum(np.asarray(source_grid.coordinates()) ** 2, axis=-1) / (2 * 0.1**2)
+    )
+    unlensed = (
+        lensing_operator(image_grid, source_grid, lens) @ source.reshape(-1)
+    ).reshape(image_grid.shape)
+    psf = gaussian_psf(0.6, 3)
+    observation = simulate_imaging(
+        unlensed, psf, noise_sigma=0.015, pixel_scale=0.12, seed=4
+    )
+    for name, values in (
+        ("image.npy", observation.data),
+        ("noise.npy", observation.noise_map),
+        ("psf.npy", psf.kernel),
+        ("mask.npy", np.zeros(image_grid.shape, dtype=bool)),
+    ):
+        np.save(tmp_path / name, np.asarray(values))
+    config = {
+        "data": "image.npy",
+        "noise_map": "noise.npy",
+        "psf": "psf.npy",
+        "mask": "mask.npy",
+        "pixel_scale": 0.12,
+        "source_grid": {"shape": [4, 4], "pixel_scale": 0.12},
+        "lens": {
+            "power_law": {
+                "einstein_radius": 0.58,
+                "slope": 2.0,
+                "q": 0.82,
+                "phi": 0.2,
+            }
+        },
+        "regularization": {"kind": "zeroth", "strength": 10.0},
+        "caustic_grid": {"shape": [101, 101], "pixel_scale": 0.02},
+        "output_directory": "fixed_outputs",
+    }
+    config_path = tmp_path / "fixed.json"
+    config_path.write_text(json.dumps(config))
+
+    assert run_fixed(config_path) == 0
+    output = tmp_path / "fixed_outputs"
+    assert (output / "reconstruction_arrays.npz").is_file()
+    assert (output / "reconstruction_diagnostics.png").is_file()
+    summary = json.loads((output / "reconstruction_summary.json").read_text())
+    assert summary["success"]
+    assert summary["regularization_strength"] == 10.0
+    assert summary["source_pixels"] == 16
+    with np.load(output / "reconstruction_arrays.npz", allow_pickle=False) as arrays:
+        assert arrays["source"].shape == source_grid.shape
+        assert arrays["model_image"].shape == image_grid.shape
+
+
+def test_real_data_model_accepts_fixed_regularization_strength() -> None:
+    config = {
+        "lens": {
+            "power_law": {"einstein_radius": 1.0, "slope": 2.0},
+            "external_shear": {"strength": 0.0, "phi": 0.0},
+        },
+        "regularization": {
+            "kind": "gradient",
+            "strength": 2.0e9,
+            "optimize_strength": False,
+        },
+    }
+    model = _make_model(config, SourceGrid((4, 4), 0.1))
+    assert model.regularization_strength == 2.0e9
 
 
 def test_staged_models_progressively_release_parameters() -> None:

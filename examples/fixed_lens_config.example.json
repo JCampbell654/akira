@@ -1,0 +1,39 @@
+{
+  "data": {"path": "/home/ppyjc14/Desktop/Work/Eales_JWST/sdp81_band7_data.fits", "hdu": 0},
+  "noise_map": {"path": "/home/ppyjc14/Desktop/Work/Eales_JWST/sdp81_band7_noise_map.fits", "hdu": 0},
+  "psf": {"path": "/home/ppyjc14/Desktop/Work/Eales_JWST/sdp81_band7_psf.fits", "hdu": 0},
+  "mask": {"path": "/home/ppyjc14/Desktop/Work/Eales_JWST/sdp81_mask.fits", "hdu": 0},
+  "pixel_scale": 0.005,
+  "supersampling": 1,
+  "source_grid": {
+    "shape": [64, 48],
+    "auto_extent": false,
+    "pixel_scale": 0.0075,
+    "centre": [0.03, 0.04]
+  },
+  "lens": {
+    "power_law": {
+      "einstein_radius": 1.609,
+      "slope": 2.0,
+      "centre_x": -0.2055,
+      "centre_y": 0.0825,
+      "q": 0.794,
+      "phi": 1.7977
+    },
+    "external_shear": {
+      "strength": 0.03,
+      "phi": 0.0,
+      "centre": [0.0, 0.0]
+    }
+  },
+  "regularization": {
+    "kind": "gradient",
+    "strength": 2e10
+  },
+  "caustic_grid": {
+    "shape": [501, 501],
+    "pixel_scale": 0.01,
+    "centre": [0.0, 0.0]
+  },
+  "output_directory": "fixed_reconstruction_output"
+}

@@ -201,11 +201,19 @@ def _make_model(config: dict[str, Any], source_grid: SourceGrid) -> PixelizedLen
         centre=tuple(shear.get("centre", (0.0, 0.0))),
     )
     regularization = config["regularization"]
+    strength_value = regularization.get(
+        "strength", regularization.get("initial_strength")
+    )
+    if strength_value is None:
+        raise ValueError(
+            "regularization must define 'strength' for a fixed value or "
+            "'initial_strength' for an optimized value."
+        )
     return PixelizedLensModel(
         lens=(power_law_model, shear_model),
         source_grid=source_grid,
         regularization_kind=regularization["kind"],
-        regularization_strength=float(regularization["initial_strength"]),
+        regularization_strength=float(strength_value),
     )
 
 
@@ -386,9 +394,19 @@ def run(config_path: Path, dry_run: bool = False) -> int:
     if dry_run:
         print("Dry run complete; optimization was not started.", flush=True)
         return 0
-    strength_bounds = config["regularization"]["strength_bounds"]
-    if strength_bounds[0] <= 0 or strength_bounds[0] >= strength_bounds[1]:
-        raise ValueError("regularization strength_bounds must be positive and ordered.")
+    regularization_config = config["regularization"]
+    optimize_strength = bool(regularization_config.get("optimize_strength", True))
+    strength_bounds = regularization_config.get("strength_bounds")
+    if optimize_strength:
+        if strength_bounds is None:
+            raise ValueError(
+                "Optimized regularization requires 'strength_bounds'. Set "
+                "'optimize_strength' to false to hold 'strength' fixed."
+            )
+        if strength_bounds[0] <= 0 or strength_bounds[0] >= strength_bounds[1]:
+            raise ValueError(
+                "regularization strength_bounds must be positive and ordered."
+            )
     progress = _ProgressDisplay(report_every=int(config.get("progress_every", 5)))
     progress.begin()
     try:
@@ -397,8 +415,12 @@ def run(config_path: Path, dry_run: bool = False) -> int:
             observation,
             image_grid,
             objective="evidence",
-            optimize_regularization_strength=True,
-            log_strength_bounds=tuple(math.log(value) for value in strength_bounds),
+            optimize_regularization_strength=optimize_strength,
+            log_strength_bounds=(
+                tuple(math.log(value) for value in strength_bounds)
+                if optimize_strength
+                else (-20.0, 30.0)
+            ),
             progress_callback=progress.update,
         )
     finally:

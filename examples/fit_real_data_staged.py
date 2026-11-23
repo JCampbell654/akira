@@ -214,10 +214,32 @@ def run(config_path: Path, dry_run: bool = False) -> int:
         print("Dry run complete; no fitting stages were started.")
         return 0
 
-    strength_bounds = config["regularization"]["strength_bounds"]
-    log_bounds = tuple(math.log(value) for value in strength_bounds)
+    regularization_config = config["regularization"]
+    optimize_strength = bool(regularization_config.get("optimize_strength", True))
+    strength_value = regularization_config.get(
+        "strength", regularization_config.get("initial_strength")
+    )
+    if strength_value is None:
+        raise ValueError(
+            "regularization must define 'strength' for a fixed value or "
+            "'initial_strength' for an optimized value."
+        )
+    strength_bounds = regularization_config.get("strength_bounds")
+    if optimize_strength:
+        if strength_bounds is None:
+            raise ValueError(
+                "Optimized regularization requires 'strength_bounds'. Set "
+                "'optimize_strength' to false to hold 'strength' fixed."
+            )
+        if strength_bounds[0] <= 0 or strength_bounds[0] >= strength_bounds[1]:
+            raise ValueError(
+                "regularization strength_bounds must be positive and ordered."
+            )
+        log_bounds = tuple(math.log(value) for value in strength_bounds)
+    else:
+        log_bounds = (-20.0, 30.0)  # Ignored by fit_pixelized_model.
     values = _starting_values(config)
-    strength = float(config["regularization"]["initial_strength"])
+    strength = float(strength_value)
     staged_output = config.get("staged_output_directory")
     if staged_output is None:
         ordinary_output = Path(config.get("output_directory", "fit_output"))
@@ -228,8 +250,9 @@ def run(config_path: Path, dry_run: bool = False) -> int:
     max_iterations = int(config.get("max_iterations", 500))
     max_line_search = int(config.get("max_line_search_steps", 100))
     final_result = None
-    for stage_number, (stage_name, free) in enumerate(STAGES, start=1):
-        print(f"\n=== Stage {stage_number}/{len(STAGES)}: {stage_name} ===", flush=True)
+    stages = STAGES if optimize_strength else STAGES[1:]
+    for stage_number, (stage_name, free) in enumerate(stages, start=1):
+        print(f"\n=== Stage {stage_number}/{len(stages)}: {stage_name} ===", flush=True)
         print("Free lens parameters: " + (", ".join(sorted(free)) or "none"), flush=True)
         model = _build_stage_model(config, source_grid, values, free, strength)
         progress = _ProgressDisplay(report_every=int(config.get("progress_every", 5)))
@@ -240,7 +263,7 @@ def run(config_path: Path, dry_run: bool = False) -> int:
                 observation,
                 image_grid,
                 objective="evidence",
-                optimize_regularization_strength=True,
+                optimize_regularization_strength=optimize_strength,
                 log_strength_bounds=log_bounds,
                 progress_callback=progress.update,
                 max_iterations=max_iterations,
@@ -258,9 +281,20 @@ def run(config_path: Path, dry_run: bool = False) -> int:
         )
         print(f"Stage result: success={result.success}; {result.message}", flush=True)
         _update_values(values, result)
+        if not optimize_strength:
+            strength = float(strength_value)
+            final_result = result
+            if not result.success:
+                print(
+                    "Stopping before releasing additional parameters. Inspect this "
+                    "stage's diagnostics and summary.",
+                    flush=True,
+                )
+                return 2
+            continue
         # exp(log_bound) can differ from the original bound by a few ulps.
-        # Clamp that harmless roundoff before using the result as the next
-        # stage's initial value.
+        # Clamp that harmless roundoff before using the result as the next stage.
+        assert strength_bounds is not None
         strength = min(
             max(result.regularization_strength, float(strength_bounds[0])),
             float(strength_bounds[1]),
