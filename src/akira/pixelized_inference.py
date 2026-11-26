@@ -102,6 +102,35 @@ class PixelizedLensModel:
 
 
 @dataclass(frozen=True, slots=True)
+class PixelizedInferenceProblem:
+    """Complete scientific inputs for pixelized-source inference.
+
+    Keeping the model, observation, and image grid together gives fitting,
+    sampling, and result serialization one stable definition of the problem.
+    """
+
+    model: PixelizedLensModel
+    observation: ImagingObservation
+    image_grid: CartesianGrid
+
+    def __post_init__(self) -> None:
+        if self.observation.data.shape != self.image_grid.shape:
+            raise ValueError("Observation and image-grid shapes must match.")
+
+    @property
+    def parameter_items(self) -> tuple[tuple[str, FreeParameter], ...]:
+        return self.model.parameter_items
+
+    @property
+    def parameter_names(self) -> tuple[str, ...]:
+        return self.model.parameter_names
+
+    @property
+    def initial_vector(self) -> Array:
+        return self.model.initial_vector
+
+
+@dataclass(frozen=True, slots=True)
 class PixelizedInferenceResult:
     """Best nonlinear lens and corresponding linear source reconstruction."""
 
@@ -122,6 +151,8 @@ class PixelizedInferenceResult:
     regularization_strength: float
     effective_source_parameters: float | None
     stationarity_residual: float | None
+    optimized_regularization_strength: bool = False
+    log_strength_bounds: tuple[float, float] | None = None
 
 
 def _log_source_evidence(
@@ -358,4 +389,10 @@ def fit_pixelized_model(
         regularization_strength=float(strength),
         effective_source_parameters=effective_parameters,
         stationarity_residual=stationarity_residual,
+        optimized_regularization_strength=optimize_regularization_strength,
+        log_strength_bounds=(
+            tuple(map(float, log_strength_bounds))
+            if optimize_regularization_strength
+            else None
+        ),
     )
