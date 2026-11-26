@@ -59,6 +59,14 @@ def test_real_data_script_runs_fit_and_writes_outputs(tmp_path) -> None:
             "strength_bounds": [0.01, 1000.0],
         },
         "caustic_grid": {"shape": [101, 101], "pixel_scale": 0.02},
+        "sampling": {
+            "enabled": True,
+            "walkers": 4,
+            "steps": 4,
+            "burn_in": 1,
+            "thin": 1,
+            "seed": 9,
+        },
         "output_directory": "outputs",
     }
     config_path = tmp_path / "config.json"
@@ -68,6 +76,9 @@ def test_real_data_script_runs_fit_and_writes_outputs(tmp_path) -> None:
     output = tmp_path / "outputs"
     assert (output / "fit_arrays.npz").is_file()
     assert (output / "fit_diagnostics.png").is_file()
+    assert (output / "posterior_samples.npz").is_file()
+    assert (output / "posterior_summary.json").is_file()
+    assert (output / "posterior_corner.png").is_file()
     summary = json.loads((output / "fit_summary.json").read_text())
     assert summary["success"]
     assert summary["regularization_strength"] > 0
@@ -75,6 +86,8 @@ def test_real_data_script_runs_fit_and_writes_outputs(tmp_path) -> None:
     with np.load(output / "fit_arrays.npz", allow_pickle=False) as arrays:
         assert arrays["source"].shape == source_grid.shape
         assert arrays["model_image"].shape == image_grid.shape
+    with np.load(output / "posterior_samples.npz", allow_pickle=False) as arrays:
+        assert arrays["chain"].shape == (3, 4, 2)
 
 
 def test_fixed_lens_script_reconstructs_without_optimization(tmp_path) -> None:

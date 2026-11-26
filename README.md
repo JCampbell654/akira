@@ -26,7 +26,10 @@ The first useful version should include:
 
 Python will be the user-facing language. The numerical backend has not yet been finalized; NumPy and JAX are leading candidates. Architecture decisions should preserve a clean separation between the scientific model, numerical backend, and inference machinery.
 
-See [docs/architecture.md](docs/architecture.md) for the evolving design and decision log.
+See [docs/architecture.md](docs/architecture.md) for the evolving design and
+decision log, and [docs/roadmap.md](docs/roadmap.md) for the version 1
+destination, milestones, and definitions of done. The portable output schema
+is documented in [docs/result-format.md](docs/result-format.md).
 
 ## Current status
 
@@ -153,9 +156,33 @@ The staged script permits 100 line-search attempts by default, compared with
 20 in the one-shot workflow. Set `max_line_search_steps` in the configuration
 to override it.
 
+Posterior sampling can be run automatically after the maximum-posterior fit by
+adding an affine-invariant ensemble configuration:
+
+```json
+"sampling": {
+  "enabled": true,
+  "walkers": 32,
+  "steps": 2000,
+  "burn_in": 500,
+  "thin": 5,
+  "seed": 42,
+  "sample_regularization_strength": true,
+  "progress_every": 10
+}
+```
+
+The sampler evaluates the source-marginalized evidence at each nonlinear
+sample; source pixels are not added to the Markov-chain dimension. Sampling
+the regularization strength uses a uniform prior in its natural logarithm over
+`regularization.strength_bounds`. Use an even number of walkers at least twice
+the sampled dimension. The output directory receives `posterior_samples.npz`,
+`posterior_summary.json`, and `posterior_corner.png`. Inspect the per-walker
+acceptance fractions and run substantially longer chains for scientific use.
+
 ## Tutorials
 
-The [`notebooks`](notebooks/) directory contains eight executable tutorials:
+The [`notebooks`](notebooks/) directory contains ten executable tutorials:
 
 1. Build the SIS-plus-Gaussian forward model from its individual equations.
 2. Add PSF convolution, masks, seeded noise, and image likelihoods.
@@ -170,6 +197,11 @@ The [`notebooks`](notebooks/) directory contains eight executable tutorials:
    source at every nonlinear evaluation.
 8. Optimize regularization strength and evidence-rank zeroth, gradient, and
    curvature source priors.
+9. Construct and inspect the common differentiable inference problem used by
+   optimization and future posterior samplers.
+10. Save, validate, reload, and inspect the versioned inference result format.
+11. Build an end-to-end modelling script and sample its source-marginalized
+    nonlinear posterior.
 
 Install the optional notebook environment with:
 

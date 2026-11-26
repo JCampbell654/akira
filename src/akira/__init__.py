@@ -23,6 +23,7 @@ from akira.inference import (
     Fixed,
     FreeParameter,
     GaussianPrior,
+    InferenceProblem,
     InferenceResult,
     LensModel,
     LogUniformPrior,
@@ -63,12 +64,24 @@ from akira.profiles import (
     Sersic,
 )
 from akira.render import render, render_sis_gaussian
+from akira.results import (
+    RESULT_FORMAT,
+    RESULT_FORMAT_VERSION,
+    StoredInferenceResult,
+    load_inference_result,
+    save_inference_result,
+)
 from akira.regularization import (
     RegularizationOptimization,
     gaussian_source_log_evidence,
     optimize_regularization,
 )
 from akira.simulate import simulate_imaging
+from akira.sampling import (
+    PixelizedSamplingResult,
+    SamplingProgress,
+    sample_pixelized_model,
+)
 
 __all__ = [
     "CartesianGrid",
@@ -87,17 +100,23 @@ __all__ = [
     "LensModel",
     "LogUniformPrior",
     "InferenceResult",
+    "InferenceProblem",
     "FitResult",
     "PSF",
     "OptimizationProgress",
     "PixelizedReconstruction",
     "PixelizedInferenceResult",
     "PixelizedLensModel",
+    "PixelizedSamplingResult",
     "ProfileModel",
     "RegularizationOptimization",
+    "RESULT_FORMAT",
+    "RESULT_FORMAT_VERSION",
     "SIS",
     "Sersic",
+    "SamplingProgress",
     "SourceGrid",
+    "StoredInferenceResult",
     "TruncatedGaussianPrior",
     "UniformPrior",
     "degrees_to_radians",
@@ -115,6 +134,7 @@ __all__ = [
     "lensing_operator",
     "masked_forward_operator",
     "lens_mapping_determinant",
+    "load_inference_result",
     "optimize_regularization",
     "plot_caustics",
     "radians_to_degrees",
@@ -127,6 +147,8 @@ __all__ = [
     "source_grid_from_lens",
     "render",
     "render_sis_gaussian",
+    "save_inference_result",
+    "sample_pixelized_model",
     "simulate_imaging",
 ]
 

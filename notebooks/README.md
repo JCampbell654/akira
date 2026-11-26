@@ -24,6 +24,16 @@ Run them in order for the most natural introduction:
 8. `08_optimize_regularization.ipynb` optimizes log regularization strength,
    reports the effective source dimension and Suyu stationarity condition, and
    evidence-ranks proper zeroth, gradient, and curvature priors.
+9. `09_construct_inference_problem.ipynb` constructs the common analytic
+   inference definition, inspects its parameter contract, and evaluates its
+   differentiable likelihood, prior, posterior, and prediction.
+10. `10_result_format_and_handling.ipynb` saves a fitted problem in the
+    versioned JSON-plus-NPZ result format, inspects its schema, reloads it with
+    validation, and works with the portable arrays.
+11. `11_build_a_modelling_script.ipynb` assembles an end-to-end pixelized-source
+    modelling script from observation arrays, grids, priors, and profile models
+    through optimization, posterior sampling, diagnostics, and production
+    script design.
 
 Install the notebook dependencies into the project environment with:
 

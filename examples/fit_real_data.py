@@ -40,6 +40,7 @@ from akira import (
     find_lensing_curves,
     fit_pixelized_model,
     plot_caustics,
+    sample_pixelized_model,
     source_grid_from_lens,
 )
 
@@ -339,6 +340,72 @@ def _save_results(
     plt.close(figure)
 
 
+def _save_sampling_results(output_directory: Path, sampling) -> None:
+    """Save posterior chains, percentile summaries, and a compact corner plot."""
+
+    samples = sampling.samples
+    percentiles = np.percentile(samples, [16.0, 50.0, 84.0], axis=0)
+    np.savez_compressed(
+        output_directory / "posterior_samples.npz",
+        chain=sampling.chain,
+        log_probability=sampling.log_probability,
+        acceptance_fraction=sampling.acceptance_fraction,
+        parameter_names=np.asarray(sampling.parameter_names),
+    )
+    summary = {
+        "method": "affine_invariant_ensemble",
+        "parameter_names": list(sampling.parameter_names),
+        "saved_samples": int(samples.shape[0]),
+        "walkers": int(sampling.chain.shape[1]),
+        "saved_steps": int(sampling.chain.shape[0]),
+        "burn_in": sampling.burn_in,
+        "thin": sampling.thin,
+        "seed": sampling.seed,
+        "mean_acceptance_fraction": float(np.mean(sampling.acceptance_fraction)),
+        "acceptance_fraction": sampling.acceptance_fraction.tolist(),
+        "percentiles": {
+            name: {"p16": float(p16), "p50": float(p50), "p84": float(p84)}
+            for name, p16, p50, p84 in zip(
+                sampling.parameter_names, *percentiles, strict=True
+            )
+        },
+    }
+    (output_directory / "posterior_summary.json").write_text(
+        json.dumps(summary, indent=2, allow_nan=False) + "\n"
+    )
+
+    dimensions = samples.shape[1]
+    figure, axes = plt.subplots(
+        dimensions,
+        dimensions,
+        figsize=(2.4 * dimensions, 2.4 * dimensions),
+        squeeze=False,
+        constrained_layout=True,
+    )
+    stride = max(1, samples.shape[0] // 5000)
+    shown = samples[::stride]
+    labels = [name.split(".")[-1] for name in sampling.parameter_names]
+    for row in range(dimensions):
+        for column in range(dimensions):
+            axis = axes[row, column]
+            if row < column:
+                axis.set_visible(False)
+            elif row == column:
+                axis.hist(shown[:, column], bins=35, color="tab:blue", alpha=0.8)
+                axis.axvline(percentiles[1, column], color="black", linewidth=1)
+            else:
+                axis.scatter(
+                    shown[:, column], shown[:, row], s=2, alpha=0.15, linewidths=0
+                )
+            if row == dimensions - 1 and axis.get_visible():
+                axis.set_xlabel(labels[column], fontsize="small")
+            if column == 0 and row > 0:
+                axis.set_ylabel(labels[row], fontsize="small")
+            axis.tick_params(labelsize="x-small")
+    figure.savefig(output_directory / "posterior_corner.png", dpi=180)
+    plt.close(figure)
+
+
 def run(config_path: Path, dry_run: bool = False) -> int:
     config_path = config_path.resolve()
     config = json.loads(config_path.read_text())
@@ -435,6 +502,54 @@ def run(config_path: Path, dry_run: bool = False) -> int:
     print(f"Regularization strength: {result.regularization_strength:.6g}")
     for name, value in result.parameters.items():
         print(f"{name}: {value:.8g}")
+    sampling_config = config.get("sampling", {})
+    if sampling_config.get("enabled", False):
+        sample_strength = bool(
+            sampling_config.get("sample_regularization_strength", optimize_strength)
+        )
+        if sample_strength and strength_bounds is None:
+            raise ValueError(
+                "Sampling regularization strength requires regularization.strength_bounds."
+            )
+        initial = np.asarray(result.parameter_vector, dtype=np.float64)
+        if not sample_strength and optimize_strength:
+            initial = initial[:-1]
+
+        def report_sampling(progress) -> None:
+            report_every = max(1, int(sampling_config.get("progress_every", 10)))
+            if progress.step == 1 or progress.step % report_every == 0:
+                print(
+                    f"Sampling | step {progress.step}/{progress.total_steps} | "
+                    f"acceptance {progress.mean_acceptance_fraction:.3f}",
+                    flush=True,
+                )
+
+        print("Starting posterior sampling...", flush=True)
+        sampling = sample_pixelized_model(
+            model,
+            observation,
+            image_grid,
+            initial_vector=initial,
+            sample_regularization_strength=sample_strength,
+            log_strength_bounds=(
+                tuple(math.log(value) for value in strength_bounds)
+                if sample_strength
+                else (-20.0, 30.0)
+            ),
+            n_walkers=int(sampling_config.get("walkers", 32)),
+            n_steps=int(sampling_config.get("steps", 1000)),
+            burn_in=int(sampling_config.get("burn_in", 200)),
+            thin=int(sampling_config.get("thin", 1)),
+            stretch_scale=float(sampling_config.get("stretch_scale", 2.0)),
+            seed=int(sampling_config.get("seed", 0)),
+            progress_callback=report_sampling,
+        )
+        _save_sampling_results(output_directory, sampling)
+        print(
+            "Posterior sampling complete | mean acceptance "
+            f"{np.mean(sampling.acceptance_fraction):.3f}",
+            flush=True,
+        )
     print(f"Results written to: {output_directory}")
     return 0 if result.success else 2
 
