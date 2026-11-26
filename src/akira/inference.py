@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import MISSING, dataclass, fields
+from dataclasses import MISSING, dataclass, field, fields
 import math
 from typing import Any, Literal
 
@@ -304,6 +304,88 @@ class LensModel:
 
 
 @dataclass(frozen=True, slots=True)
+class InferenceProblem:
+    """A differentiable analytic-lens imaging inference problem.
+
+    This is the common boundary between a scientific model and an inference
+    algorithm. Optimizers and posterior samplers can use the same parameter
+    ordering, model construction, prediction, likelihood, and prior methods.
+    """
+
+    model: LensModel
+    observation: ImagingObservation
+    grid: CartesianGrid
+    _coordinates: Array = field(init=False, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        if self.observation.data.shape != self.grid.shape:
+            raise ValueError("Observation and grid shapes must match.")
+        object.__setattr__(self, "_coordinates", self.grid.subpixel_coordinates())
+
+    @property
+    def parameter_items(self) -> tuple[tuple[str, FreeParameter], ...]:
+        """Free parameters in the stable order used by every vector method."""
+
+        return self.model.parameter_items
+
+    @property
+    def parameter_names(self) -> tuple[str, ...]:
+        """Names corresponding to entries in a parameter vector."""
+
+        return self.model.parameter_names
+
+    @property
+    def initial_vector(self) -> Array:
+        """Configured starting point in physical parameter space."""
+
+        return self.model.initial_vector
+
+    @property
+    def bounds(self) -> tuple[tuple[float | None, float | None], ...]:
+        """Physical bounds supplied by each parameter's prior."""
+
+        return tuple(parameter.prior.bounds for _, parameter in self.parameter_items)
+
+    def from_unit(self, unit_vector: Array) -> Array:
+        """Transform a unit-cube vector through the declared priors."""
+
+        return self.model.from_unit(unit_vector)
+
+    def build_model(self, vector: Array) -> tuple[LensPlane, CompositeLight]:
+        """Construct the physical lens and source for a parameter vector."""
+
+        return self.model.build(vector)
+
+    def predict(self, vector: Array) -> Array:
+        """Render and PSF-convolve the detector image for a parameter vector."""
+
+        lens, source = self.build_model(vector)
+        unconvolved = render_from_coordinates(self._coordinates, lens, source)
+        return convolve_psf(unconvolved, self.observation.psf.kernel)
+
+    def log_likelihood(self, vector: Array) -> Array:
+        """Return the normalized masked Gaussian image log likelihood."""
+
+        image = self.predict(vector)
+        return gaussian_log_likelihood(
+            self.observation.data,
+            image,
+            self.observation.noise_map,
+            self.observation.mask,
+        )
+
+    def log_prior(self, vector: Array) -> Array:
+        """Return the sum of all declared normalized parameter log priors."""
+
+        return self.model.log_prior(vector)
+
+    def log_posterior(self, vector: Array) -> Array:
+        """Return log likelihood plus log prior, up to no omitted constants."""
+
+        return self.log_likelihood(vector) + self.log_prior(vector)
+
+
+@dataclass(frozen=True, slots=True)
 class InferenceResult:
     """Best-fitting model and diagnostics from general ML or MAP optimization."""
 
@@ -331,29 +413,16 @@ def fit_model(
 ) -> InferenceResult:
     """Fit every free model parameter using JAX gradients and L-BFGS-B."""
 
-    if observation.data.shape != grid.shape:
-        raise ValueError("Observation and grid shapes must match.")
     if mode not in ("maximum_likelihood", "map"):
         raise ValueError("mode must be 'maximum_likelihood' or 'map'.")
-    parameter_items = model.parameter_items
-    if not parameter_items:
+    problem = InferenceProblem(model, observation, grid)
+    if not problem.parameter_items:
         raise ValueError("LensModel contains no free parameters.")
-    coordinates = grid.subpixel_coordinates()
-
-    def components(values: Array) -> tuple[Array, Array, Array]:
-        lens, source = model.build(values)
-        unconvolved = render_from_coordinates(coordinates, lens, source)
-        image = convolve_psf(unconvolved, observation.psf.kernel)
-        log_likelihood = gaussian_log_likelihood(
-            observation.data, image, observation.noise_map, observation.mask
-        )
-        log_prior = model.log_prior(values)
-        return image, log_likelihood, log_prior
 
     def objective(values: Array) -> Array:
-        _, log_likelihood, log_prior = components(values)
-        target = log_likelihood if mode == "maximum_likelihood" else log_likelihood + log_prior
-        return -target
+        if mode == "maximum_likelihood":
+            return -problem.log_likelihood(values)
+        return -problem.log_posterior(values)
 
     value_and_gradient = jax.jit(jax.value_and_grad(objective))
 
@@ -363,21 +432,23 @@ def fit_model(
 
     optimized = minimize(
         scipy_objective,
-        x0=np.asarray(model.initial_vector, dtype=np.float64),
+        x0=np.asarray(problem.initial_vector, dtype=np.float64),
         jac=True,
         method="L-BFGS-B",
-        bounds=[parameter.prior.bounds for _, parameter in parameter_items],
+        bounds=problem.bounds,
         options={"ftol": 1e-12, "gtol": 1e-8, "maxiter": 1000},
     )
     fitted = jnp.asarray(optimized.x, dtype=jnp.float64)
-    fitted_lens, fitted_source = model.build(fitted)
-    fitted_image, log_likelihood, log_prior = components(fitted)
+    fitted_lens, fitted_source = problem.build_model(fitted)
+    fitted_image = problem.predict(fitted)
+    log_likelihood = problem.log_likelihood(fitted)
+    log_prior = problem.log_prior(fitted)
     covariance = None
     if hasattr(optimized.hess_inv, "todense"):
         covariance = jnp.asarray(optimized.hess_inv.todense(), dtype=jnp.float64)
-    values_by_name = dict(zip(model.parameter_names, map(float, optimized.x)))
+    values_by_name = dict(zip(problem.parameter_names, map(float, optimized.x)))
     return InferenceResult(
-        parameter_names=model.parameter_names,
+        parameter_names=problem.parameter_names,
         parameter_vector=fitted,
         parameters=values_by_name,
         lens=fitted_lens,
