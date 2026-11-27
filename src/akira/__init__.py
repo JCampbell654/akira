@@ -35,6 +35,7 @@ from akira.inference import (
 from akira.lensing import ray_trace
 from akira.likelihood import gaussian_log_likelihood
 from akira.model import CompositeLight, LensPlane
+from akira.nested import NautilusSamplingResult, sample_pixelized_model_nautilus
 from akira.pixelized import (
     PixelizedReconstruction,
     SourceGrid,
@@ -52,9 +53,17 @@ from akira.pixelized import (
 )
 from akira.pixelized_inference import (
     OptimizationProgress,
+    PixelizedInferenceProblem,
     PixelizedInferenceResult,
     PixelizedLensModel,
     fit_pixelized_model,
+)
+from akira.pixelized_results import (
+    PIXELIZED_RESULT_FORMAT,
+    PIXELIZED_RESULT_FORMAT_VERSION,
+    StoredPixelizedInferenceResult,
+    load_pixelized_inference_result,
+    save_pixelized_inference_result,
 )
 from akira.profiles import (
     EllipticalPowerLaw,
@@ -104,10 +113,15 @@ __all__ = [
     "FitResult",
     "PSF",
     "OptimizationProgress",
+    "NautilusSamplingResult",
     "PixelizedReconstruction",
+    "PixelizedInferenceProblem",
     "PixelizedInferenceResult",
     "PixelizedLensModel",
     "PixelizedSamplingResult",
+    "StoredPixelizedInferenceResult",
+    "PIXELIZED_RESULT_FORMAT",
+    "PIXELIZED_RESULT_FORMAT_VERSION",
     "ProfileModel",
     "RegularizationOptimization",
     "RESULT_FORMAT",
@@ -135,6 +149,7 @@ __all__ = [
     "masked_forward_operator",
     "lens_mapping_determinant",
     "load_inference_result",
+    "load_pixelized_inference_result",
     "optimize_regularization",
     "plot_caustics",
     "radians_to_degrees",
@@ -148,7 +163,9 @@ __all__ = [
     "render",
     "render_sis_gaussian",
     "save_inference_result",
+    "save_pixelized_inference_result",
     "sample_pixelized_model",
+    "sample_pixelized_model_nautilus",
     "simulate_imaging",
 ]
 
